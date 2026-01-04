@@ -75,9 +75,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('adminMsg', (data) => {
-    const room = socket.data?.room;
-    if (!room) return;
-    socket.to(room).emit('adminMsg', data);
+    // Глобально на все подключения (не ограничиваем комнатой)
+    io.emit('adminMsg', data);
   });
 
   socket.on('leaveMatch', () => leaveMatch(socket));

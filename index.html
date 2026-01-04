@@ -3000,7 +3000,6 @@ document.getElementById('play-btn').addEventListener('click', () => {
     state.mpOpponentId = null;
     state.mpRoom = null;
     state.mpSpawnIndex = 0;
-    disconnectMultiplayer();
     resetRemotePlayers();
     createDefaultMap();
     resetGame();
@@ -3028,6 +3027,11 @@ function ensureMatchmaking() {
     }
     connectMultiplayer();
 }
+
+// Авто-подключение сокета даже в одиночке, чтобы получать глобальные сообщения
+window.addEventListener('load', () => {
+    connectMultiplayer();
+});
 
 function startMultiplayer() {
     state.isMultiplayer = true;
@@ -3062,7 +3066,6 @@ function leaveMultiplayer() {
         clearTimeout(mpRespawnTimeout);
         mpRespawnTimeout = null;
     }
-    disconnectMultiplayer();
     resetRemotePlayers();
     createDefaultMap();
     resetGame();
