@@ -82,6 +82,49 @@
             width: 100%;
         }
         .cheat-slider input[type=range] { flex: 1; }
+        #admin-panel {
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            width: 280px;
+            padding: 12px;
+            background: rgba(0,0,0,0.35);
+            border: 1px solid #444;
+            border-radius: 8px;
+            color: #ddd;
+            font-size: 13px;
+        }
+        #admin-panel.active { display: flex; }
+        #admin-panel textarea {
+            width: 100%;
+            min-height: 60px;
+            border-radius: 6px;
+            border: 1px solid #444;
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            padding: 8px;
+        }
+        #admin-panel button {
+            padding: 8px 10px;
+            border: 1px solid #555;
+            background: rgba(74,222,128,0.2);
+            color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        #admin-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 10px 16px;
+            text-align: center;
+            font-weight: bold;
+            color: #fff;
+            background: rgba(239,68,68,0.8);
+            z-index: 1500;
+            display: none;
+        }
         @keyframes unlockPulse {
             0% { box-shadow: 0 0 0 rgba(74,222,128,0.0); }
             50% { box-shadow: 0 0 20px rgba(74,222,128,0.8); }
@@ -609,6 +652,12 @@
                     <label for="cheat-aimbot">Aimbot</label>
                 </div>
             </div>
+            <div id="admin-panel">
+                <strong>Админ панель</strong>
+                <textarea id="admin-message" placeholder="Глобальное сообщение"></textarea>
+                <button id="admin-send">Отправить</button>
+                <small>Открыть/закрыть: клавиша J</small>
+            </div>
         </div>
         <div id="controls-info">
             <p>WASD - Движение | ПРОБЕЛ - Прыжок | ЛКМ - Стрельба | ПКМ - Прицел | R - Перезарядка | G - Граната</p>
@@ -891,6 +940,7 @@ const state = {
         aimbot: false
     },
     cheatsUnlocked: false,
+    adminUnlocked: false,
     mpKills: 0,
     mpDeaths: 0,
     // Bomb state
@@ -1175,6 +1225,10 @@ function createAimMap() {
     stack(6, -2, 2, 2.0, 1.6, 2.0);
     stack(-9, -9, 1, 1.8, 1.4, 1.8);
     stack(9, 9, 1, 1.8, 1.4, 1.8);
+    stack(-12, 5, 2, 1.6, 1.2, 1.6);
+    stack(12, -5, 2, 1.6, 1.2, 1.6);
+    stack(0, 10, 2, 2.0, 1.6, 2.0);
+    stack(0, -10, 2, 2.0, 1.6, 2.0);
 }
 
 createDefaultMap();
@@ -1464,20 +1518,20 @@ class Enemy {
         this.group.add(this.weaponGroup);
         
         // Health bar background
-        const hbBgGeo = new THREE.PlaneGeometry(0.8, 0.08);
-        const hbBgMat = new THREE.MeshBasicMaterial({ color: 0x333333, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
+    const hbBgGeo = new THREE.PlaneGeometry(0.8, 0.08);
+    const hbBgMat = new THREE.MeshBasicMaterial({ color: 0x333333, side: THREE.DoubleSide, depthTest: true, depthWrite: true });
         this.healthBarBg = new THREE.Mesh(hbBgGeo, hbBgMat);
         this.healthBarBg.position.y = 2.3;
-        this.healthBarBg.renderOrder = 5;
+    this.healthBarBg.renderOrder = 5;
         this.group.add(this.healthBarBg);
         
         // Health bar fill
-        const hbFillGeo = new THREE.PlaneGeometry(0.78, 0.06);
-        const hbFillMat = new THREE.MeshBasicMaterial({ color: 0xe94560, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
+    const hbFillGeo = new THREE.PlaneGeometry(0.78, 0.06);
+    const hbFillMat = new THREE.MeshBasicMaterial({ color: 0xe94560, side: THREE.DoubleSide, depthTest: true, depthWrite: true });
         this.healthBarFill = new THREE.Mesh(hbFillGeo, hbFillMat);
         this.healthBarFill.position.y = 2.3;
         this.healthBarFill.position.z = 0.01;
-        this.healthBarFill.renderOrder = 6;
+    this.healthBarFill.renderOrder = 6;
         this.group.add(this.healthBarFill);
         
         this.group.position.set(x, 0, z);
@@ -1853,6 +1907,19 @@ function updateESPForActor(actor) {
         head.material.depthWrite = !active;
         head.renderOrder = active ? 999 : 0;
     }
+    const hbBg = actor.healthBarBg;
+    const hbFill = actor.healthBarFill;
+    [hbBg, hbFill].forEach((m, idx) => {
+        if (!m || !m.material) return;
+        m.material.depthTest = !active;
+        m.material.depthWrite = !active;
+        m.renderOrder = active ? 998 + idx : 0;
+    });
+}
+
+function updateESPHighlight() {
+    enemies.forEach(e => updateESPForActor(e));
+    remotePlayers.forEach(p => updateESPForActor(p));
 }
 
 function getAimbotDirection(isSniper) {
@@ -1911,6 +1978,19 @@ function updateMpScore() {
 // ==================== GRENADES ====================
 const grenades = [];
 const grenadeMaterial = new THREE.MeshLambertMaterial({ color: 0x2d5a27 });
+const grenadeMaterialRemote = new THREE.MeshLambertMaterial({ color: 0x55ff55 });
+
+function spawnGrenade(px, py, pz, vx, vy, vz, ownerId = null) {
+    const grenadeGeo = new THREE.SphereGeometry(0.15, 8, 8);
+    const mat = ownerId && mpSocket && ownerId !== mpSocket.id ? grenadeMaterialRemote : grenadeMaterial;
+    const grenade = new THREE.Mesh(grenadeGeo, mat);
+    grenade.position.set(px, py, pz);
+    grenade.velocity = new THREE.Vector3(vx, vy, vz);
+    grenade.life = 1.5; // Faster explosion
+    grenade.bounces = 0;
+    scene.add(grenade);
+    grenades.push(grenade);
+}
 
 function throwGrenade() {
     if (!state.canThrowGrenade || state.grenades <= 0) return;
@@ -1920,27 +2000,19 @@ function throwGrenade() {
     state.canThrowGrenade = false;
     updateHUD();
     
-    // Create grenade mesh
-    const grenadeGeo = new THREE.SphereGeometry(0.15, 8, 8);
-    const grenade = new THREE.Mesh(grenadeGeo, grenadeMaterial);
-    
-    // Start position (from player)
-    grenade.position.copy(camera.position);
-    
-    // Throw direction
     const throwDir = new THREE.Vector3();
     camera.getWorldDirection(throwDir);
-    throwDir.y += 0.3; // Arc upward
+    throwDir.y += 0.3;
     throwDir.normalize();
+    const vel = throwDir.multiplyScalar(25);
+    const pos = camera.position.clone();
     
-    grenade.velocity = throwDir.multiplyScalar(25);
-    grenade.life = 2.5; // Explodes after 2.5 seconds
-    grenade.bounces = 0;
+    spawnGrenade(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, mpSocket ? mpSocket.id : null);
     
-    scene.add(grenade);
-    grenades.push(grenade);
+    if (mpSocket && mpSocket.connected && state.isMultiplayer) {
+        mpSocket.emit('grenade', { x: pos.x, y: pos.y, z: pos.z, vx: vel.x, vy: vel.y, vz: vel.z });
+    }
     
-    // Cooldown
     setTimeout(() => {
         state.canThrowGrenade = true;
     }, 500);
@@ -2151,6 +2223,18 @@ function updateBomb(delta) {
 // ==================== SHOOTING ====================
 const raycaster = new THREE.Raycaster();
 
+function hasLineOfSight(targetPoint) {
+    if (state.cheats.enabled && state.cheats.wallbang) return true;
+    const dir = targetPoint.clone().sub(camera.position);
+    const dist = dir.length();
+    if (dist < 0.01) return true;
+    dir.normalize();
+    const rc = new THREE.Raycaster(camera.position, dir);
+    const wallHits = rc.intersectObjects(colliders.map(c => c.mesh), true);
+    if (wallHits.length && wallHits[0].distance < dist - 0.05) return false;
+    return true;
+}
+
 function shoot() {
     // Handle knife attack separately
     if (state.currentWeapon === 'knife') {
@@ -2250,38 +2334,47 @@ function shoot() {
             ? enemies.find(e => e.isAlive && (e.mesh === hit.object || e.head === hit.object))
             : null;
         if (hitEnemy) {
-            // Sniper = instant kill, otherwise headshot = 2.5x
-            const isHeadshot = hit.object.name === 'head';
-            let damage;
-            if (isSniper) {
-                damage = cfg.damage; // 200 = instant kill
+            if (hasLineOfSight(hit.point)) {
+                const isHeadshot = hit.object.name === 'head';
+                let damage;
+                if (isSniper) {
+                    damage = cfg.damage; // 200 = instant kill
+                } else {
+                    damage = isHeadshot ? cfg.damage * 2.5 : cfg.damage;
+                }
+                hitEnemy.takeDamage(damage, isHeadshot || isSniper);
+                
+                for (let i = 0; i < 5; i++) {
+                    createParticle(hit.point.x, hit.point.y, hit.point.z, (isHeadshot || isSniper) ? 0xffff00 : 0xe94560);
+                }
             } else {
-                damage = isHeadshot ? cfg.damage * 2.5 : cfg.damage;
-            }
-            hitEnemy.takeDamage(damage, isHeadshot || isSniper);
-            
-            // Impact particles
-            for (let i = 0; i < 5; i++) {
-                createParticle(hit.point.x, hit.point.y, hit.point.z, (isHeadshot || isSniper) ? 0xffff00 : 0xe94560);
+                // blocked by wall, treat as wall hit
+                const wallHits = raycaster.intersectObjects(colliders.map(c => c.mesh));
+                if (wallHits.length > 0) end = wallHits[0].point;
             }
         } else {
             const remoteEntry = Array.from(remotePlayers.entries()).find(([, p]) => p.body === hit.object || p.head === hit.object);
             if (remoteEntry) {
                 const [remoteId] = remoteEntry;
-                const isHeadshot = hit.object.name === 'head';
-                let damage;
-                if (isSniper) {
-                    damage = cfg.damage;
+                if (hasLineOfSight(hit.point)) {
+                    const isHeadshot = hit.object.name === 'head';
+                    let damage;
+                    if (isSniper) {
+                        damage = cfg.damage;
+                    } else {
+                        damage = isHeadshot ? cfg.damage * 2.5 : cfg.damage;
+                    }
+                    applyRemoteDamage(remoteId, damage, isHeadshot || isSniper);
+                    if (mpSocket && mpSocket.connected) {
+                        mpSocket.emit('hit', { targetId: remoteId, damage, isHeadshot: isHeadshot || isSniper });
+                    }
+                    showHitmarker(isHeadshot || isSniper);
+                    for (let i = 0; i < 5; i++) {
+                        createParticle(hit.point.x, hit.point.y, hit.point.z, (isHeadshot || isSniper) ? 0xffff00 : 0xe94560);
+                    }
                 } else {
-                    damage = isHeadshot ? cfg.damage * 2.5 : cfg.damage;
-                }
-                applyRemoteDamage(remoteId, damage, isHeadshot || isSniper);
-                if (mpSocket && mpSocket.connected) {
-                    mpSocket.emit('hit', { targetId: remoteId, damage, isHeadshot: isHeadshot || isSniper });
-                }
-                showHitmarker(isHeadshot || isSniper);
-                for (let i = 0; i < 5; i++) {
-                    createParticle(hit.point.x, hit.point.y, hit.point.z, (isHeadshot || isSniper) ? 0xffff00 : 0xe94560);
+                    const wallHits = raycaster.intersectObjects(colliders.map(c => c.mesh));
+                    if (wallHits.length > 0) end = wallHits[0].point;
                 }
             }
         }
@@ -2434,7 +2527,7 @@ function checkCollision(position, radius = 0.5) {
         if (playerBox.intersectsBox(collider.box)) {
             // Если стоим на верхней поверхности, не считаем это коллизией
             const colliderTop = collider.box.max.y;
-            if (playerMinY >= colliderTop - 0.2) {
+            if (playerMinY >= colliderTop - 0.3) {
                 continue;
             }
             return true;
@@ -2920,7 +3013,12 @@ document.getElementById('play-btn').addEventListener('click', () => {
     if (mpBtn) mpBtn.textContent = 'Играть мультиплеер 1v1';
     
     enterGameUI();
-    document.getElementById('exit-btn').style.display = 'block';
+    // Fallback: если pointer lock не взялся, всё равно запускаем управление
+    controls.isLocked = true;
+    document.getElementById('menu').style.display = 'none';
+    document.getElementById('hud').style.display = 'block';
+    document.getElementById('crosshair').style.display = 'block';
+    if (isMobile) document.getElementById('exit-btn').style.display = 'block';
 });
 
 function ensureMatchmaking() {
@@ -2951,7 +3049,7 @@ function startMultiplayer() {
     enterGameUI();
     ensureMatchmaking();
     updateMpScore();
-    document.getElementById('exit-btn').style.display = 'block';
+    if (isMobile) document.getElementById('exit-btn').style.display = 'block';
 }
 
 function leaveMultiplayer() {
@@ -3013,6 +3111,10 @@ document.getElementById('exit-btn').addEventListener('click', () => {
 const CHEATS_STORAGE_KEY = 'standoffCheatsV2';
 const secretInput = document.getElementById('secret-code');
 const cheatPanel = document.getElementById('cheat-panel');
+const adminPanel = document.getElementById('admin-panel');
+const adminBanner = document.getElementById('admin-banner');
+const adminMsgInput = document.getElementById('admin-message');
+const adminSendBtn = document.getElementById('admin-send');
 const cheatControls = [
     { id: 'cheat-god', key: 'godMode' },
     { id: 'cheat-ammo', key: 'infiniteAmmo' },
@@ -3041,6 +3143,7 @@ function saveCheatsState() {
     try {
         localStorage.setItem(CHEATS_STORAGE_KEY, JSON.stringify({
             unlocked: state.cheatsUnlocked,
+            adminUnlocked: state.adminUnlocked,
             cheats: state.cheats
         }));
     } catch (e) {}
@@ -3065,24 +3168,53 @@ function applyCheatUIFromState() {
 }
 
 // Load cheats at startup
+function normalizeCheatsEnabled() {
+    const active = Object.entries(state.cheats).some(([k, v]) => {
+        if (k === 'enabled' || k === 'speedMultiplier') return false;
+        return !!v;
+    });
+    state.cheats.enabled = state.cheatsUnlocked && active;
+    if (!state.cheats.enabled) {
+        Object.keys(state.cheats).forEach(k => {
+            if (k === 'enabled' || k === 'speedMultiplier') return;
+            state.cheats[k] = false;
+        });
+    }
+}
+
 const savedCheats = loadCheatsState();
 state.cheatsUnlocked = !!savedCheats.unlocked;
 if (savedCheats.cheats) {
     Object.assign(state.cheats, savedCheats.cheats);
 }
-if (state.cheatsUnlocked) {
-    state.cheats.enabled = true;
-    applyCheatUIFromState();
+state.adminUnlocked = !!savedCheats.adminUnlocked;
+if (typeof state.cheats.speedMultiplier !== 'number' || isNaN(state.cheats.speedMultiplier)) {
+    state.cheats.speedMultiplier = 2;
+}
+normalizeCheatsEnabled();
+applyCheatUIFromState();
+if (state.adminUnlocked) {
+    adminPanel.classList.add('active');
 }
 
 function unlockCheats() {
-    if (secretInput.value.trim() === 'Федя') {
-        state.cheats.enabled = true;
+    const code = secretInput.value.trim();
+    if (code === 'Федя') {
         state.cheatsUnlocked = true;
         cheatPanel.classList.add('active');
         document.getElementById('secret-wrapper').classList.add('unlocked');
         saveCheatsState();
         applyCheatUIFromState();
+        normalizeCheatsEnabled();
+    } else if (code === 'тикитоки') {
+        state.adminUnlocked = true;
+        state.cheatsUnlocked = true;
+        cheatPanel.classList.add('active');
+        adminPanel.classList.add('active');
+        document.getElementById('secret-wrapper').classList.add('unlocked');
+        saveCheatsState();
+        applyCheatUIFromState();
+        normalizeCheatsEnabled();
     }
 }
 
@@ -3090,6 +3222,43 @@ if (secretInput) {
     secretInput.addEventListener('change', unlockCheats);
     secretInput.addEventListener('keyup', (e) => {
         if (e.key === 'Enter') unlockCheats();
+    });
+}
+
+function toggleAdminPanel() {
+    if (!state.adminUnlocked) return;
+    adminPanel.classList.toggle('active');
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.code === 'KeyJ') {
+        toggleAdminPanel();
+    }
+});
+
+if (adminSendBtn) {
+    adminSendBtn.addEventListener('click', () => {
+        const msg = (adminMsgInput?.value || '').trim();
+        if (!msg) return;
+        showAdminBanner(msg);
+        if (mpSocket && mpSocket.connected) {
+            mpSocket.emit('adminMsg', { msg });
+        }
+    });
+}
+
+function showAdminBanner(msg) {
+    if (!adminBanner) return;
+    adminBanner.textContent = msg;
+    adminBanner.style.display = 'block';
+    setTimeout(() => {
+        adminBanner.style.display = 'none';
+    }, 4000);
+}
+
+if (adminBanner) {
+    adminBanner.addEventListener('click', () => {
+        adminBanner.style.display = 'none';
     });
 }
 
@@ -3115,6 +3284,7 @@ cheatControls.forEach(({ id, key }) => {
         if (key === 'esp') {
             updateESPHighlight();
         }
+        normalizeCheatsEnabled();
         saveCheatsState();
     });
 });
@@ -3747,14 +3917,14 @@ function createRemotePlayer(color = 0x4ade80) {
     
     // Health bar
     const hbBgGeo = new THREE.PlaneGeometry(0.8, 0.08);
-    const hbBgMat = new THREE.MeshBasicMaterial({ color: 0x333333, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
+    const hbBgMat = new THREE.MeshBasicMaterial({ color: 0x333333, side: THREE.DoubleSide, depthTest: true, depthWrite: true });
     const healthBarBg = new THREE.Mesh(hbBgGeo, hbBgMat);
     healthBarBg.position.y = 2.3;
     healthBarBg.renderOrder = 5;
     group.add(healthBarBg);
     
     const hbFillGeo = new THREE.PlaneGeometry(0.78, 0.06);
-    const hbFillMat = new THREE.MeshBasicMaterial({ color: 0x4ade80, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
+    const hbFillMat = new THREE.MeshBasicMaterial({ color: 0x4ade80, side: THREE.DoubleSide, depthTest: true, depthWrite: true });
     const healthBarFill = new THREE.Mesh(hbFillGeo, hbFillMat);
     healthBarFill.position.y = 2.3;
     healthBarFill.position.z = 0.01;
@@ -3857,6 +4027,11 @@ function handleRemoteState(data) {
     }
 }
 
+function handleRemoteGrenade({ id, x, y, z, vx, vy, vz }) {
+    if (mpSocket && id === mpSocket.id) return;
+    spawnGrenade(x, y, z, vx, vy, vz, id);
+}
+
 function handleRemoteShoot({ id }) {
     if (!state.isMultiplayer) return;
     if (mpSocket && id === mpSocket.id) return;
@@ -3918,6 +4093,8 @@ function connectMultiplayer() {
     mpSocket.on('shoot', handleRemoteShoot);
     mpSocket.on('hit', handleHitEvent);
     mpSocket.on('respawn', handleRemoteRespawn);
+    mpSocket.on('grenade', handleRemoteGrenade);
+    mpSocket.on('adminMsg', ({ msg }) => showAdminBanner(msg));
     mpSocket.on('leave', ({ id }) => removeRemotePlayer(id));
 }
 

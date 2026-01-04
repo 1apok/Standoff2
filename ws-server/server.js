@@ -68,6 +68,18 @@ io.on('connection', (socket) => {
     socket.to(room).emit('respawn', { ...data, id: socket.id });
   });
 
+  socket.on('grenade', (data) => {
+    const room = socket.data?.room;
+    if (!room) return;
+    socket.to(room).emit('grenade', { ...data, id: socket.id });
+  });
+
+  socket.on('adminMsg', (data) => {
+    const room = socket.data?.room;
+    if (!room) return;
+    socket.to(room).emit('adminMsg', data);
+  });
+
   socket.on('leaveMatch', () => leaveMatch(socket));
 
   socket.on('disconnect', () => {
