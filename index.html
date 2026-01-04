@@ -213,6 +213,29 @@
         }
         #bomb-status.danger { color: #e94560; }
         #bomb-status.success { color: #4ade80; }
+        #mp-score {
+            position: fixed;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            gap: 10px;
+            padding: 8px 12px;
+            background: rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 10px;
+            font-weight: bold;
+            color: #fff;
+            backdrop-filter: blur(4px);
+        }
+        .score-badge {
+            padding: 6px 10px;
+            border-radius: 8px;
+            min-width: 80px;
+            text-align: center;
+        }
+        .score-blue { background: rgba(59,130,246,0.6); }
+        .score-red { background: rgba(239,68,68,0.6); }
         #weapon-name {
             position: absolute; bottom: 110px; right: 30px;
             color: #888; font-size: 14px;
@@ -713,6 +736,11 @@
         </div>
     </div>
     
+    <div id="mp-score">
+        <div class="score-badge score-blue" id="score-me">You: 0</div>
+        <div class="score-badge score-red" id="score-enemy">Enemy: 0</div>
+    </div>
+    
     <!-- Bomb status -->
     <div id="bomb-status"></div>
     
@@ -846,6 +874,8 @@ const state = {
         aimbot: false
     },
     cheatsUnlocked: false,
+    mpKills: 0,
+    mpDeaths: 0,
     // Bomb state
     bombPlanted: false,
     bombPosition: null,
@@ -1845,6 +1875,20 @@ function getAimbotDirection(isSniper) {
     return best ? best.dir : null;
 }
 
+function updateMpScore() {
+    const board = document.getElementById('mp-score');
+    if (!board) return;
+    if (state.isMultiplayer) {
+        board.style.display = 'flex';
+        const me = document.getElementById('score-me');
+        const en = document.getElementById('score-enemy');
+        if (me) me.textContent = `You: ${state.mpKills}`;
+        if (en) en.textContent = `Enemy: ${state.mpDeaths}`;
+    } else {
+        board.style.display = 'none';
+    }
+}
+
 // ==================== GRENADES ====================
 const grenades = [];
 const grenadeMaterial = new THREE.MeshLambertMaterial({ color: 0x2d5a27 });
@@ -2686,6 +2730,8 @@ function applyPlayerDamage(amount) {
         if (state.isMultiplayer) {
             state.health = 0;
             updateHUD();
+            state.mpDeaths++;
+            updateMpScore();
             if (mpRespawnTimeout) clearTimeout(mpRespawnTimeout);
             mpRespawnTimeout = setTimeout(respawnLocalPlayer, 1200);
         } else {
@@ -2699,6 +2745,8 @@ function resetGame(options = {}) {
     
     resetPlayerStats();
     state.kills = 0;
+    state.mpKills = 0;
+    state.mpDeaths = 0;
     state.bombPlanted = false;
     state.bombTimer = 0;
     state.bombDefuseTimer = 0;
@@ -2882,6 +2930,7 @@ function startMultiplayer() {
     if (btn) btn.textContent = 'Поиск соперника...';
     enterGameUI();
     ensureMatchmaking();
+    updateMpScore();
 }
 
 function leaveMultiplayer() {
@@ -2910,6 +2959,7 @@ function leaveMultiplayer() {
     document.getElementById('mobile-controls').classList.remove('active');
     const btn = document.getElementById('mp-btn');
     if (btn) btn.textContent = 'Играть мультиплеер 1v1';
+    document.getElementById('mp-score').style.display = 'none';
 }
 
 // Multiplayer button
@@ -3043,6 +3093,7 @@ window.addEventListener('focus', () => {
     if (state.isPlaying && !controls.isLocked && !isMobile) {
         controls.lock();
     }
+    updateMpScore();
 });
 
 // ==================== GAME LOOP ====================
@@ -3719,7 +3770,9 @@ function applyRemoteDamage(id, damage, isHeadshot = false) {
         p.isAlive = false;
         p.group.visible = false;
         state.kills++;
+        state.mpKills++;
         updateHUD();
+        updateMpScore();
     }
 }
 
