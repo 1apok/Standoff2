@@ -53,6 +53,11 @@
             background: rgba(255,255,255,0.05);
             color: #fff;
             text-align: center;
+            transition: box-shadow 0.3s ease, transform 0.2s ease;
+        }
+        #secret-wrapper.unlocked #secret-code {
+            box-shadow: 0 0 12px rgba(74, 222, 128, 0.7);
+            transform: translateY(-2px);
         }
         #cheat-panel {
             display: none;
@@ -68,6 +73,14 @@
         #cheat-panel.active { display: flex; flex-direction: column; }
         .cheat-row { display: flex; align-items: center; gap: 8px; }
         .cheat-row input { transform: scale(1.1); }
+        @keyframes unlockPulse {
+            0% { box-shadow: 0 0 0 rgba(74,222,128,0.0); }
+            50% { box-shadow: 0 0 20px rgba(74,222,128,0.8); }
+            100% { box-shadow: 0 0 0 rgba(74,222,128,0.0); }
+        }
+        #secret-wrapper.unlocked {
+            animation: unlockPulse 1s ease;
+        }
         #controls-info {
             margin-top: 40px; color: #666; text-align: center; line-height: 1.8;
         }
@@ -520,6 +533,26 @@
                     <input type="checkbox" id="cheat-speed">
                     <label for="cheat-speed">Скорость x2</label>
                 </div>
+                <div class="cheat-row">
+                    <input type="checkbox" id="cheat-fly">
+                    <label for="cheat-fly">Fly</label>
+                </div>
+                <div class="cheat-row">
+                    <input type="checkbox" id="cheat-noclip">
+                    <label for="cheat-noclip">Noclip</label>
+                </div>
+                <div class="cheat-row">
+                    <input type="checkbox" id="cheat-wallbang">
+                    <label for="cheat-wallbang">Стрельба через стены</label>
+                </div>
+                <div class="cheat-row">
+                    <input type="checkbox" id="cheat-rapid">
+                    <label for="cheat-rapid">Очень быстрый огонь</label>
+                </div>
+                <div class="cheat-row">
+                    <input type="checkbox" id="cheat-esp">
+                    <label for="cheat-esp">ESP подсветка</label>
+                </div>
             </div>
         </div>
         <div id="controls-info">
@@ -778,13 +811,20 @@ const state = {
     isMoving: false,
     isSprinting: false,
     jumpHeld: false,
+    flyUp: false,
+    flyDown: false,
     crosshairSpread: 0,
     cheats: {
         enabled: false,
         godMode: false,
         infiniteAmmo: false,
         noRecoil: false,
-        speedBoost: false
+        speedBoost: false,
+        fly: false,
+        noclip: false,
+        wallbang: false,
+        rapidFire: false,
+        esp: false
     },
     // Bomb state
     bombPlanted: false,
@@ -1703,7 +1743,7 @@ function createTracer(start, end) {
     const geo = new THREE.BufferGeometry().setFromPoints(points);
     const mat = new THREE.LineBasicMaterial({ color: 0xffff00, transparent: true, opacity: 1 });
     const line = new THREE.Line(geo, mat);
-    line.life = 0.1;
+    line.life = (state.cheats.enabled && state.cheats.rapidFire) ? 0.05 : 0.1;
     scene.add(line);
     tracers.push(line);
 }
@@ -1718,6 +1758,20 @@ function updateTracers(delta) {
             scene.remove(t);
             tracers.splice(i, 1);
         }
+    }
+}
+
+function updateESPForActor(actor) {
+    const active = state.cheats.enabled && state.cheats.esp;
+    if (!actor) return;
+    const mesh = actor.mesh || actor.body;
+    const head = actor.head;
+    const color = active ? 0x00ffea : 0x000000;
+    if (mesh && mesh.material && 'emissive' in mesh.material) {
+        mesh.material.emissive.setHex(color);
+    }
+    if (head && head.material && 'emissive' in head.material) {
+        head.material.emissive.setHex(color);
     }
 }
 
@@ -2091,7 +2145,7 @@ function shoot() {
     } else {
         // Check wall hits
         const wallHits = raycaster.intersectObjects(colliders.map(c => c.mesh));
-        if (wallHits.length > 0) {
+        if (wallHits.length > 0 && !(state.cheats.enabled && state.cheats.wallbang)) {
             end = wallHits[0].point;
             for (let i = 0; i < 3; i++) {
                 createParticle(end.x, end.y, end.z, 0xd4a574);
@@ -2106,7 +2160,7 @@ function shoot() {
     // Fire rate cooldown
     setTimeout(() => {
         state.canShoot = true;
-    }, cfg.fireRate);
+    }, (state.cheats.enabled && state.cheats.rapidFire) ? 40 : cfg.fireRate);
     
     // Restore ammo if infinite
     if (infiniteAmmo) {
@@ -2226,6 +2280,7 @@ function reload() {
 
 // ==================== COLLISION DETECTION ====================
 function checkCollision(position, radius = 0.5) {
+    if (state.cheats.enabled && state.cheats.noclip) return false;
     const playerBox = new THREE.Box3(
         new THREE.Vector3(position.x - radius, position.y - CONFIG.player.height, position.z - radius),
         new THREE.Vector3(position.x + radius, position.y + 0.2, position.z + radius)
@@ -2298,24 +2353,35 @@ function updatePlayer(delta) {
         camera.position.z = newPos.z;
     }
     
-    // Gravity and jumping
-    state.velocity.y -= CONFIG.player.gravity * delta;
-    camera.position.y += state.velocity.y * delta;
-    
-    // Ground check
-    const groundY = getGroundHeight(camera.position.x, camera.position.z) + CONFIG.player.height;
-    if (camera.position.y <= groundY) {
-        camera.position.y = groundY;
+    if (state.cheats.enabled && state.cheats.fly) {
+        // Fly mode: свободный Y без гравитации
+        const flySpeed = speed;
+        let dy = 0;
+        if (state.flyUp) dy += flySpeed;
+        if (state.flyDown) dy -= flySpeed;
+        camera.position.y += dy * delta;
         state.velocity.y = 0;
-        state.isGrounded = true;
+        state.isGrounded = false;
+    } else {
+        // Gravity and jumping
+        state.velocity.y -= CONFIG.player.gravity * delta;
+        camera.position.y += state.velocity.y * delta;
         
-        // Авто-прыжок при удержании пробела и движении по земле
-        if (state.jumpHeld) {
-            state.velocity.y = CONFIG.player.jumpForce;
+        // Ground check
+        const groundY = getGroundHeight(camera.position.x, camera.position.z) + CONFIG.player.height;
+        if (camera.position.y <= groundY) {
+            camera.position.y = groundY;
+            state.velocity.y = 0;
+            state.isGrounded = true;
+            
+            // Авто-прыжок при удержании пробела и движении по земле
+            if (state.jumpHeld) {
+                state.velocity.y = CONFIG.player.jumpForce;
+                state.isGrounded = false;
+            }
+        } else {
             state.isGrounded = false;
         }
-    } else {
-        state.isGrounded = false;
     }
     
     // Keep in bounds
@@ -2595,13 +2661,26 @@ document.addEventListener('keydown', (e) => {
         case 'KeyA': state.moveLeft = true; break;
         case 'KeyD': state.moveRight = true; break;
         case 'Space':
-            state.jumpHeld = true;
-            if (state.isGrounded) {
-                state.velocity.y = CONFIG.player.jumpForce;
-                state.isGrounded = false;
+            if (state.cheats.enabled && state.cheats.fly) {
+                state.flyUp = true;
+            } else {
+                state.jumpHeld = true;
+                if (state.isGrounded) {
+                    state.velocity.y = CONFIG.player.jumpForce;
+                    state.isGrounded = false;
+                }
             }
             break;
-        case 'ShiftLeft': state.isSprinting = true; break;
+        case 'ShiftLeft':
+            if (state.cheats.enabled && state.cheats.fly) {
+                state.flyDown = true;
+            } else {
+                state.isSprinting = true;
+            }
+            break;
+        case 'ControlLeft':
+            if (state.cheats.enabled && state.cheats.fly) state.flyDown = true;
+            break;
         case 'KeyR': reload(); break;
         case 'KeyG': throwGrenade(); break;
         case 'KeyB': plantBomb(); break;
@@ -2617,8 +2696,17 @@ document.addEventListener('keyup', (e) => {
         case 'KeyS': state.moveBackward = false; break;
         case 'KeyA': state.moveLeft = false; break;
         case 'KeyD': state.moveRight = false; break;
-        case 'ShiftLeft': state.isSprinting = false; break;
-        case 'Space': state.jumpHeld = false; break;
+        case 'ShiftLeft':
+            state.isSprinting = false;
+            state.flyDown = false;
+            break;
+        case 'ControlLeft':
+            state.flyDown = false;
+            break;
+        case 'Space':
+            state.jumpHeld = false;
+            state.flyUp = false;
+            break;
     }
 });
 
@@ -2762,13 +2850,19 @@ const cheatControls = [
     { id: 'cheat-god', key: 'godMode' },
     { id: 'cheat-ammo', key: 'infiniteAmmo' },
     { id: 'cheat-recoil', key: 'noRecoil' },
-    { id: 'cheat-speed', key: 'speedBoost' }
+    { id: 'cheat-speed', key: 'speedBoost' },
+    { id: 'cheat-fly', key: 'fly' },
+    { id: 'cheat-noclip', key: 'noclip' },
+    { id: 'cheat-wallbang', key: 'wallbang' },
+    { id: 'cheat-rapid', key: 'rapidFire' },
+    { id: 'cheat-esp', key: 'esp' }
 ];
 
 function unlockCheats() {
     if (secretInput.value.trim() === 'Федя') {
         state.cheats.enabled = true;
         cheatPanel.classList.add('active');
+        document.getElementById('secret-wrapper').classList.add('unlocked');
     }
 }
 
@@ -2791,6 +2885,9 @@ cheatControls.forEach(({ id, key }) => {
             state.sniperAmmo = CONFIG.sniper.magazineSize;
             state.sniperReserve = CONFIG.sniper.reserveAmmo;
             updateHUD();
+        }
+        if (key === 'esp') {
+            updateESPHighlight();
         }
     });
 });
@@ -2828,6 +2925,7 @@ function animate() {
         if (!state.isMultiplayer) {
             enemies.forEach(enemy => {
                 enemy.update(delta, camera.position);
+                updateESPForActor(enemy);
             });
         }
     }
@@ -3365,13 +3463,15 @@ function createRemotePlayer(color = 0x4ade80) {
     const group = new THREE.Group();
     
     const torsoGeo = new THREE.CylinderGeometry(0.35, 0.4, 1.1, 8);
-    const body = new THREE.Mesh(torsoGeo, new THREE.MeshLambertMaterial({ color }));
+    const bodyMat = new THREE.MeshLambertMaterial({ color, emissive: 0x000000 });
+    const body = new THREE.Mesh(torsoGeo, bodyMat);
     body.position.y = 1;
     body.castShadow = true;
     group.add(body);
     
     const headGeo = new THREE.SphereGeometry(0.25, 8, 8);
-    const head = new THREE.Mesh(headGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }));
+    const headMat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x000000 });
+    const head = new THREE.Mesh(headGeo, headMat);
     head.position.y = 1.8;
     head.castShadow = true;
     head.name = 'head';
@@ -3597,6 +3697,7 @@ function updateRemotePlayers(delta) {
             p.healthBarBg.lookAt(camera.position);
             p.healthBarFill.lookAt(camera.position);
         }
+        updateESPForActor(p);
     });
 }
 
