@@ -37,24 +37,37 @@
             transform: translateY(-3px); box-shadow: 0 15px 40px rgba(233, 69, 96, 0.6);
         }
         #mp-btn { margin-top: 18px; }
-        #debug-btn { margin-top: 12px; font-size: 16px; padding: 12px 32px; }
-
-        #debug-panel {
+        #secret-wrapper {
+            margin-top: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+            color: #aaa;
+        }
+        #secret-code {
+            width: 240px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            text-align: center;
+        }
+        #cheat-panel {
             display: none;
-            margin-top: 16px;
-            padding: 14px;
-            background: rgba(0,0,0,0.4);
+            width: 260px;
+            padding: 12px;
+            background: rgba(0,0,0,0.35);
             border: 1px solid #444;
             border-radius: 8px;
             color: #ddd;
-            width: 320px;
-            max-width: 90vw;
-            font-family: monospace;
-            font-size: 12px;
-            white-space: pre-wrap;
-            word-break: break-word;
+            font-size: 13px;
+            gap: 8px;
         }
-        #debug-panel.active { display: block; }
+        #cheat-panel.active { display: flex; flex-direction: column; }
+        .cheat-row { display: flex; align-items: center; gap: 8px; }
+        .cheat-row input { transform: scale(1.1); }
         #controls-info {
             margin-top: 40px; color: #666; text-align: center; line-height: 1.8;
         }
@@ -484,11 +497,31 @@
         <p>Браузерный шутер</p>
         <button id="play-btn" class="primary-btn">Играть</button>
         <button id="mp-btn" class="primary-btn">Играть мультиплеер</button>
-        <button id="debug-btn" class="primary-btn">Debug</button>
         <button id="edit-controls-btn">Настроить управление</button>
         <button id="edit-hud-btn">Настроить HUD</button>
         <button id="edit-crosshair-btn">Настроить прицел</button>
-        <div id="debug-panel">Debug info...</div>
+        <div id="secret-wrapper">
+            <span>Secret code</span>
+            <input id="secret-code" type="text" placeholder="Введите код">
+            <div id="cheat-panel">
+                <div class="cheat-row">
+                    <input type="checkbox" id="cheat-god">
+                    <label for="cheat-god">Бессмертие</label>
+                </div>
+                <div class="cheat-row">
+                    <input type="checkbox" id="cheat-ammo">
+                    <label for="cheat-ammo">Бесконечные патроны</label>
+                </div>
+                <div class="cheat-row">
+                    <input type="checkbox" id="cheat-recoil">
+                    <label for="cheat-recoil">Без отдачи</label>
+                </div>
+                <div class="cheat-row">
+                    <input type="checkbox" id="cheat-speed">
+                    <label for="cheat-speed">Скорость x2</label>
+                </div>
+            </div>
+        </div>
         <div id="controls-info">
             <p>WASD - Движение | ПРОБЕЛ - Прыжок | ЛКМ - Стрельба | ПКМ - Прицел | R - Перезарядка | G - Граната</p>
             <p>1/2 - Смена оружия | B - Установить бомбу</p>
@@ -746,6 +779,13 @@ const state = {
     isSprinting: false,
     jumpHeld: false,
     crosshairSpread: 0,
+    cheats: {
+        enabled: false,
+        godMode: false,
+        infiniteAmmo: false,
+        noRecoil: false,
+        speedBoost: false
+    },
     // Bomb state
     bombPlanted: false,
     bombPosition: null,
@@ -786,6 +826,8 @@ class FPSControls {
     connect() {
         document.addEventListener('pointerlockchange', () => {
             this.isLocked = document.pointerLockElement === this.domElement;
+            // Не выбрасываем в меню при переключении вкладки/сворачивании
+            if (document.hidden) return;
             if (!this.isLocked && state.isPlaying && !isMobile) {
                 document.getElementById('menu').style.display = 'flex';
                 document.getElementById('hud').style.display = 'none';
@@ -1686,7 +1728,8 @@ const grenadeMaterial = new THREE.MeshLambertMaterial({ color: 0x2d5a27 });
 function throwGrenade() {
     if (!state.canThrowGrenade || state.grenades <= 0) return;
     
-    state.grenades--;
+    const infiniteAmmo = state.cheats.enabled && state.cheats.infiniteAmmo;
+    if (!infiniteAmmo) state.grenades--;
     state.canThrowGrenade = false;
     updateHUD();
     
@@ -1938,10 +1981,13 @@ function shoot() {
         mpSocket.emit('shoot', {});
     }
     
-    if (isSniper) {
-        state.sniperAmmo--;
-    } else {
-        state.ammo--;
+    const infiniteAmmo = state.cheats.enabled && state.cheats.infiniteAmmo;
+    if (!infiniteAmmo) {
+        if (isSniper) {
+            state.sniperAmmo--;
+        } else {
+            state.ammo--;
+        }
     }
     updateHUD();
     
@@ -1953,8 +1999,9 @@ function shoot() {
     
     // Recoil
     const cfg = isSniper ? CONFIG.sniper : CONFIG.weapon;
-    targetWeaponRecoil = isSniper ? 0.1 : 0.05;
-    const recoilX = cfg.recoil * (0.8 + Math.random() * 0.4);
+    const noRecoil = state.cheats.enabled && state.cheats.noRecoil;
+    targetWeaponRecoil = noRecoil ? 0 : (isSniper ? 0.1 : 0.05);
+    const recoilX = noRecoil ? 0 : cfg.recoil * (0.8 + Math.random() * 0.4);
     controls.euler.x = Math.min(Math.PI / 2, controls.euler.x + recoilX);
     camera.quaternion.setFromEuler(controls.euler);
     
@@ -1967,7 +2014,8 @@ function shoot() {
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
     
     // Get shoot direction with spread (no spread when scoped)
-    const spread = state.isScoped ? 0 : state.crosshairSpread * 0.001;
+    const spreadBase = state.isScoped ? 0 : state.crosshairSpread * 0.001;
+    const spread = noRecoil ? 0 : spreadBase;
     const direction = raycaster.ray.direction.clone();
     direction.x += (Math.random() - 0.5) * spread;
     direction.y += (Math.random() - 0.5) * spread;
@@ -2059,6 +2107,18 @@ function shoot() {
     setTimeout(() => {
         state.canShoot = true;
     }, cfg.fireRate);
+    
+    // Restore ammo if infinite
+    if (infiniteAmmo) {
+        if (isSniper) {
+            state.sniperAmmo = cfg.magazineSize;
+            state.sniperReserve = cfg.reserveAmmo || CONFIG.sniper.reserveAmmo;
+        } else {
+            state.ammo = cfg.magazineSize;
+            state.reserveAmmo = cfg.reserveAmmo || CONFIG.weapon.reserveAmmo;
+        }
+        updateHUD();
+    }
     
     // Auto reload
     const reserve = isSniper ? state.sniperReserve : state.reserveAmmo;
@@ -2202,7 +2262,8 @@ function getGroundHeight(x, z) {
 function updatePlayer(delta) {
     if (!controls.isLocked) return;
     
-    const speed = CONFIG.player.speed * (state.isSprinting ? CONFIG.player.sprintMultiplier : 1);
+    let speed = CONFIG.player.speed * (state.isSprinting ? CONFIG.player.sprintMultiplier : 1);
+    if (state.cheats.enabled && state.cheats.speedBoost) speed *= 1.8;
     
     // Get movement direction
     const forward = new THREE.Vector3();
@@ -2471,6 +2532,7 @@ function respawnLocalPlayer() {
 }
 
 function applyPlayerDamage(amount) {
+    if (state.cheats.enabled && state.cheats.godMode) return;
     state.health -= amount;
     updateHUD();
     showDamageOverlay();
@@ -2693,33 +2755,45 @@ document.getElementById('mp-btn').addEventListener('click', () => {
     }
 });
 
-// Debug toggle
-document.getElementById('debug-btn').addEventListener('click', () => {
-    const panel = document.getElementById('debug-panel');
-    panel.classList.toggle('active');
-    updateDebugPanel();
-});
+// Secret code / cheats
+const secretInput = document.getElementById('secret-code');
+const cheatPanel = document.getElementById('cheat-panel');
+const cheatControls = [
+    { id: 'cheat-god', key: 'godMode' },
+    { id: 'cheat-ammo', key: 'infiniteAmmo' },
+    { id: 'cheat-recoil', key: 'noRecoil' },
+    { id: 'cheat-speed', key: 'speedBoost' }
+];
 
-function updateDebugPanel() {
-    const panel = document.getElementById('debug-panel');
-    if (!panel || !panel.classList.contains('active')) return;
-    const pos = camera.position;
-    const data = {
-        mpUrl: MP_URL,
-        connected: !!(mpSocket && mpSocket.connected),
-        socketId: mpSocket ? mpSocket.id : null,
-        lastError: mpLastError,
-        isMultiplayer: state.isMultiplayer,
-        isSearching: state.isSearchingMatch,
-        room: state.mpRoom,
-        opponentId: state.mpOpponentId,
-        pos: { x: pos.x.toFixed(2), y: pos.y.toFixed(2), z: pos.z.toFixed(2) },
-        kills: state.kills
-    };
-    panel.textContent = JSON.stringify(data, null, 2);
+function unlockCheats() {
+    if (secretInput.value.trim() === 'Федя') {
+        state.cheats.enabled = true;
+        cheatPanel.classList.add('active');
+    }
 }
 
-setInterval(updateDebugPanel, 1000);
+if (secretInput) {
+    secretInput.addEventListener('change', unlockCheats);
+    secretInput.addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') unlockCheats();
+    });
+}
+
+cheatControls.forEach(({ id, key }) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('change', () => {
+        state.cheats[key] = !!el.checked;
+        // Если нужны немедленные эффекты — например, заполнить магазины при бесконечных патронах
+        if (key === 'infiniteAmmo' && state.cheats.infiniteAmmo) {
+            state.ammo = CONFIG.weapon.magazineSize;
+            state.reserveAmmo = CONFIG.weapon.reserveAmmo;
+            state.sniperAmmo = CONFIG.sniper.magazineSize;
+            state.sniperReserve = CONFIG.sniper.reserveAmmo;
+            updateHUD();
+        }
+    });
+});
 
 // Window resize
 window.addEventListener('resize', () => {
@@ -3283,7 +3357,6 @@ let crosshairConfig = loadCrosshairConfig();
 // ==================== MULTIPLAYER (1v1 AIM) ====================
 // Фиксированный адрес сокет-сервера (Railway)
 const MP_URL = 'wss://standoff2-production.up.railway.app';
-let mpLastError = null;
 let mpSocket = null;
 let mpSendInterval = null;
 const remotePlayers = new Map();
@@ -3411,8 +3484,8 @@ function handleRemoteRespawn({ id, x, y, z }) {
     p.group.visible = true;
     p.healthBarFill.scale.x = 1;
     p.healthBarFill.position.x = 0;
-    p.group.position.set(x, y, z);
-    p.target.pos.set(x, y, z);
+    p.group.position.set(x, 0, z);
+    p.target.pos.set(x, 0, z);
     p.target.rotY = 0;
 }
 
@@ -3421,7 +3494,7 @@ function handleRemoteState(data) {
     const { id, x, y, z, rotY } = data;
     if (mpSocket && id === mpSocket.id) return;
     const p = getRemotePlayer(id);
-    p.target.pos.set(x, y, z);
+    p.target.pos.set(x, 0, z);
     p.target.rotY = rotY || 0;
 }
 
@@ -3449,13 +3522,11 @@ function connectMultiplayer() {
 
     mpSocket.on('connect_error', (err) => {
         console.warn('MP connect_error', err.message);
-        mpLastError = err?.message || String(err);
         const btn = document.getElementById('mp-btn');
         if (btn) btn.textContent = 'Ошибка подключения';
     });
     mpSocket.on('error', (err) => {
         console.warn('MP error', err);
-        mpLastError = err?.message || String(err);
     });
 
     mpSocket.on('disconnect', () => {
@@ -3511,7 +3582,7 @@ function sendPlayerState() {
     if (!mpSocket || !mpSocket.connected || !state.isMultiplayer || !state.isPlaying) return;
     mpSocket.emit('state', {
         x: camera.position.x,
-        y: camera.position.y,
+        y: 0, // всегда на земле, чтобы не зависали модели
         z: camera.position.z,
         rotY: camera.rotation.y,
     });
