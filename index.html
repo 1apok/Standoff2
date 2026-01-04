@@ -26,16 +26,17 @@
             text-shadow: 0 0 30px rgba(233, 69, 96, 0.5);
         }
         #menu p { color: #888; margin-bottom: 40px; font-size: 18px; }
-        #play-btn {
-            padding: 20px 60px; font-size: 24px; font-weight: bold;
+        .primary-btn {
+            padding: 18px 56px; font-size: 22px; font-weight: bold;
             background: linear-gradient(135deg, #e94560, #c23a51);
-            color: white; border: none; border-radius: 8px; cursor: pointer;
+            color: white; border: none; border-radius: 10px; cursor: pointer;
             text-transform: uppercase; letter-spacing: 3px;
             transition: all 0.3s ease; box-shadow: 0 10px 30px rgba(233, 69, 96, 0.4);
         }
-        #play-btn:hover {
+        .primary-btn:hover {
             transform: translateY(-3px); box-shadow: 0 15px 40px rgba(233, 69, 96, 0.6);
         }
+        #mp-btn { margin-top: 18px; }
         #controls-info {
             margin-top: 40px; color: #666; text-align: center; line-height: 1.8;
         }
@@ -463,8 +464,8 @@
     <div id="menu">
         <h1>Standoff</h1>
         <p>Браузерный шутер</p>
-        <button id="play-btn">Играть</button>
-        <button id="mp-btn">Мультиплеер (beta)</button>
+        <button id="play-btn" class="primary-btn">Играть</button>
+        <button id="mp-btn" class="primary-btn">Играть мультиплеер</button>
         <button id="edit-controls-btn">Настроить управление</button>
         <button id="edit-hud-btn">Настроить HUD</button>
         <button id="edit-crosshair-btn">Настроить прицел</button>
@@ -688,9 +689,21 @@ const CONFIG = {
     }
 };
 
+const DEFAULT_MAP_SIZE = CONFIG.map.size;
+const AIM_MAP_SIZE = 24;
+const AIM_SPAWNS = [
+    { x: -12, z: -10 },
+    { x: 12, z: 10 }
+];
+
 // ==================== GAME STATE ====================
 const state = {
     isPlaying: false,
+    isMultiplayer: false,
+    isSearchingMatch: false,
+    mpSpawnIndex: 0,
+    mpOpponentId: null,
+    mpRoom: null,
     health: CONFIG.player.health,
     currentweapon: '1/2', // rifle or sniper
     ammo: CONFIG.weapon.magazineSize,
@@ -711,6 +724,7 @@ const state = {
     moveRight: false,
     isMoving: false,
     isSprinting: false,
+    jumpHeld: false,
     crosshairSpread: 0,
     // Bomb state
     bombPlanted: false,
@@ -744,6 +758,7 @@ class FPSControls {
         this.isLocked = false;
         this.euler = new THREE.Euler(0, 0, 0, 'YXZ');
         this.sensitivity = 0.002;
+        this.maxStep = 0.05; // clamp per-event to avoid acceleration spikes
         
         this.connect();
     }
@@ -762,8 +777,10 @@ class FPSControls {
             if (!this.isLocked || isMobile) return;
             
             this.euler.setFromQuaternion(this.camera.quaternion);
-            this.euler.y -= e.movementX * this.sensitivity;
-            this.euler.x -= e.movementY * this.sensitivity;
+            const stepX = THREE.MathUtils.clamp(e.movementX * this.sensitivity, -this.maxStep, this.maxStep);
+            const stepY = THREE.MathUtils.clamp(e.movementY * this.sensitivity, -this.maxStep, this.maxStep);
+            this.euler.y -= stepX;
+            this.euler.x -= stepY;
             this.euler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.euler.x));
             this.camera.quaternion.setFromEuler(this.euler);
         });
@@ -813,7 +830,20 @@ const materials = {
 };
 
 // ==================== MAP CREATION ====================
+const mapGroup = new THREE.Group();
+scene.add(mapGroup);
 const colliders = [];
+
+function clearMap() {
+    colliders.length = 0;
+    while (mapGroup.children.length > 0) {
+        const child = mapGroup.children.pop();
+        mapGroup.remove(child);
+        if (child.geometry && child.geometry.dispose) {
+            child.geometry.dispose();
+        }
+    }
+}
 
 function createBox(w, h, d, x, y, z, material, isCollider = true) {
     const geometry = new THREE.BoxGeometry(w, h, d);
@@ -821,7 +851,7 @@ function createBox(w, h, d, x, y, z, material, isCollider = true) {
     mesh.position.set(x, y, z);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    scene.add(mesh);
+    mapGroup.add(mesh);
     
     if (isCollider) {
         colliders.push({
@@ -832,7 +862,9 @@ function createBox(w, h, d, x, y, z, material, isCollider = true) {
     return mesh;
 }
 
-function createMap() {
+function createDefaultMap() {
+    CONFIG.map.size = DEFAULT_MAP_SIZE;
+    clearMap();
     const S = CONFIG.map.size;
 
     // Ground
@@ -840,7 +872,7 @@ function createMap() {
     const ground = new THREE.Mesh(groundGeo, materials.sand);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
-    scene.add(ground);
+    mapGroup.add(ground);
 
     // Outer walls (sandstone perimeter)
     createBox(S * 2, 5.5, 1, 0, 2.75, -S, materials.stone);
@@ -921,7 +953,57 @@ function createMap() {
     props.forEach(([w,h,d,x,y,z,mat]) => createBox(w,h,d,x,y,z,mat));
 }
 
-createMap();
+function createAimMap() {
+    CONFIG.map.size = AIM_MAP_SIZE;
+    clearMap();
+    const S = CONFIG.map.size;
+
+    const groundGeo = new THREE.PlaneGeometry(S * 2, S * 2);
+    const ground = new THREE.Mesh(groundGeo, materials.sandDark);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    mapGroup.add(ground);
+
+    // Perimeter walls to keep players inside
+    createBox(S * 2, 3.5, 1, 0, 1.75, -S, materials.plaster);
+    createBox(S * 2, 3.5, 1, 0, 1.75, S, materials.plaster);
+    createBox(1, 3.5, S * 2, -S, 1.75, 0, materials.plaster);
+    createBox(1, 3.5, S * 2, S, 1.75, 0, materials.plaster);
+
+    // Slightly raised mid to echo aim maps
+    createBox(8, 0.4, 8, 0, 0.2, 0, materials.sand);
+
+    const stack = (x, z, levels = 1, w = 2.2, h = 1.6, d = 2.2) => {
+        for (let i = 0; i < levels; i++) {
+            createBox(w, h, d, x, h / 2 + i * h, z, materials.wood);
+        }
+    };
+
+    // Central stacks
+    stack(0, 0, 3);
+    stack(-3, 0, 2);
+    stack(3, 0, 2);
+    stack(0, -4, 2);
+    stack(0, 4, 2);
+
+    // Side covers
+    stack(-8, -6, 1);
+    stack(-8, 6, 1);
+    stack(8, -6, 1);
+    stack(8, 6, 1);
+
+    // Long lane crates
+    stack(-5, -10, 1, 2.4, 1.4, 2.4);
+    stack(5, 10, 1, 2.4, 1.4, 2.4);
+
+    // Small boxes scatter for peeking
+    stack(-2, -8, 1, 1.4, 1.2, 1.4);
+    stack(2, 8, 1, 1.4, 1.2, 1.4);
+    stack(-10, 0, 1, 1.6, 1.4, 1.6);
+    stack(10, 0, 1, 1.6, 1.4, 1.6);
+}
+
+createDefaultMap();
 
 // ==================== WEAPON MODEL ====================
 const weaponGroup = new THREE.Group();
@@ -1094,6 +1176,7 @@ function switchWeapon(weapon) {
     state.currentWeapon = weapon;
     state.isScoped = false;
     document.getElementById('scope-overlay').classList.remove('active');
+    document.getElementById('crosshair').style.display = 'block';
     camera.fov = 75;
     camera.updateProjectionMatrix();
     
@@ -1279,13 +1362,7 @@ class Enemy {
         
         // Accuracy check
         if (Math.random() < CONFIG.enemy.accuracy) {
-            state.health -= CONFIG.enemy.damage;
-            updateHUD();
-            showDamageOverlay();
-            
-            if (state.health <= 0) {
-                gameOver();
-            }
+            applyPlayerDamage(CONFIG.enemy.damage);
         }
         
         // Tracer from enemy
@@ -1638,10 +1715,7 @@ function explodeGrenade(grenade) {
     const playerDist = camera.position.distanceTo(explosionPos);
     if (playerDist < explosionRadius) {
         const damage = maxDamage * 0.5 * (1 - playerDist / explosionRadius);
-        state.health -= damage;
-        updateHUD();
-        showDamageOverlay();
-        if (state.health <= 0) gameOver();
+        applyPlayerDamage(damage);
     }
     
     // Explosion particles
@@ -1708,6 +1782,7 @@ let bombMesh = null;
 let bombLight = null;
 
 function plantBomb() {
+    if (state.isMultiplayer) return;
     if (state.bombPlanted) return;
     
     state.bombPlanted = true;
@@ -1839,6 +1914,10 @@ function shoot() {
     
     state.canShoot = false;
     
+    if (state.isMultiplayer && mpSocket && mpSocket.connected) {
+        mpSocket.emit('shoot', {});
+    }
+    
     if (isSniper) {
         state.sniperAmmo--;
     } else {
@@ -1875,13 +1954,22 @@ function shoot() {
     direction.z += (Math.random() - 0.5) * spread;
     raycaster.ray.direction.copy(direction.normalize());
     
-    // Check enemy hits (body + head)
+    // Check enemy hits (body + head) and remote players
     const enemyParts = [];
-    enemies.filter(e => e.isAlive).forEach(e => {
-        enemyParts.push(e.mesh);
-        enemyParts.push(e.head);
+    if (!state.isMultiplayer) {
+        enemies.filter(e => e.isAlive).forEach(e => {
+            enemyParts.push(e.mesh);
+            enemyParts.push(e.head);
+        });
+    }
+    const remoteParts = [];
+    remotePlayers.forEach(p => {
+        if (p.isAlive) {
+            remoteParts.push(p.body);
+            remoteParts.push(p.head);
+        }
     });
-    const hits = raycaster.intersectObjects(enemyParts, true);
+    const hits = raycaster.intersectObjects([...enemyParts, ...remoteParts], true);
     
     // Tracer
     const start = camera.position.clone();
@@ -1893,7 +1981,9 @@ function shoot() {
         end = hit.point;
         
         // Find which enemy was hit
-        const hitEnemy = enemies.find(e => e.isAlive && (e.mesh === hit.object || e.head === hit.object));
+        const hitEnemy = (!state.isMultiplayer)
+            ? enemies.find(e => e.isAlive && (e.mesh === hit.object || e.head === hit.object))
+            : null;
         if (hitEnemy) {
             // Sniper = instant kill, otherwise headshot = 2.5x
             const isHeadshot = hit.object.name === 'head';
@@ -1908,6 +1998,26 @@ function shoot() {
             // Impact particles
             for (let i = 0; i < 5; i++) {
                 createParticle(hit.point.x, hit.point.y, hit.point.z, (isHeadshot || isSniper) ? 0xffff00 : 0xe94560);
+            }
+        } else {
+            const remoteEntry = Array.from(remotePlayers.entries()).find(([, p]) => p.body === hit.object || p.head === hit.object);
+            if (remoteEntry) {
+                const [remoteId] = remoteEntry;
+                const isHeadshot = hit.object.name === 'head';
+                let damage;
+                if (isSniper) {
+                    damage = cfg.damage;
+                } else {
+                    damage = isHeadshot ? cfg.damage * 2.5 : cfg.damage;
+                }
+                applyRemoteDamage(remoteId, damage, isHeadshot || isSniper);
+                if (mpSocket && mpSocket.connected) {
+                    mpSocket.emit('hit', { targetId: remoteId, damage, isHeadshot: isHeadshot || isSniper });
+                }
+                showHitmarker(isHeadshot || isSniper);
+                for (let i = 0; i < 5; i++) {
+                    createParticle(hit.point.x, hit.point.y, hit.point.z, (isHeadshot || isSniper) ? 0xffff00 : 0xe94560);
+                }
             }
         }
     } else {
@@ -1979,6 +2089,30 @@ function knifeAttack() {
         }
     });
     
+    // Remote players in MP
+    remotePlayers.forEach((p, id) => {
+        if (!p.isAlive) return;
+        
+        const targetPos = p.group.position.clone();
+        targetPos.y = 1;
+        const playerPos = camera.position.clone();
+        
+        const dist = playerPos.distanceTo(targetPos);
+        if (dist > knifeRange) return;
+        
+        const toEnemy = targetPos.clone().sub(playerPos).normalize();
+        const dot = cameraDir.dot(toEnemy);
+        if (dot > 0.5) {
+            applyRemoteDamage(id, CONFIG.knife.damage, true);
+            if (mpSocket && mpSocket.connected) {
+                mpSocket.emit('hit', { targetId: id, damage: CONFIG.knife.damage, isHeadshot: true });
+            }
+            for (let i = 0; i < 8; i++) {
+                createParticle(targetPos.x, targetPos.y, targetPos.z, 0xe94560);
+            }
+        }
+    });
+    
     // Cooldown
     setTimeout(() => {
         state.canShoot = true;
@@ -2016,9 +2150,15 @@ function checkCollision(position, radius = 0.5) {
         new THREE.Vector3(position.x - radius, position.y - CONFIG.player.height, position.z - radius),
         new THREE.Vector3(position.x + radius, position.y + 0.2, position.z + radius)
     );
+    const playerMinY = position.y - CONFIG.player.height;
     
     for (const collider of colliders) {
         if (playerBox.intersectsBox(collider.box)) {
+            // Если стоим на верхней поверхности, не считаем это коллизией
+            const colliderTop = collider.box.max.y;
+            if (playerMinY >= colliderTop - 0.2) {
+                continue;
+            }
             return true;
         }
     }
@@ -2087,6 +2227,12 @@ function updatePlayer(delta) {
         camera.position.y = groundY;
         state.velocity.y = 0;
         state.isGrounded = true;
+        
+        // Авто-прыжок при удержании пробела и движении по земле
+        if (state.jumpHeld) {
+            state.velocity.y = CONFIG.player.jumpForce;
+            state.isGrounded = false;
+        }
     } else {
         state.isGrounded = false;
     }
@@ -2256,47 +2402,105 @@ function checkWinCondition() {
     return false;
 }
 
-function resetGame() {
+let mpRespawnTimeout = null;
+
+function resetPlayerStats() {
     state.health = CONFIG.player.health;
     state.ammo = CONFIG.weapon.magazineSize;
     state.reserveAmmo = CONFIG.weapon.reserveAmmo;
     state.sniperAmmo = CONFIG.sniper.magazineSize;
     state.sniperReserve = CONFIG.sniper.reserveAmmo;
     state.grenades = 3;
-    state.kills = 0;
     state.isReloading = false;
     state.currentWeapon = 'rifle';
     state.isScoped = false;
+    state.regenTimer = 0;
+    state.canShoot = true;
+    state.canThrowGrenade = true;
+    weaponGroup.visible = true;
+    sniperGroup.visible = false;
+    document.getElementById('weapon-name').textContent = 'AK-47';
+    document.getElementById('scope-overlay').classList.remove('active');
+    camera.fov = 75;
+    camera.updateProjectionMatrix();
+    updateHUD();
+}
+
+function placePlayer(position) {
+    camera.position.copy(position);
+    state.velocity.set(0, 0, 0);
+    state.isGrounded = true;
+}
+
+function getAimSpawn(index = 0) {
+    const spawn = AIM_SPAWNS[index % AIM_SPAWNS.length];
+    return new THREE.Vector3(spawn.x, CONFIG.player.height, spawn.z);
+}
+
+function respawnLocalPlayer() {
+    if (mpRespawnTimeout) {
+        clearTimeout(mpRespawnTimeout);
+        mpRespawnTimeout = null;
+    }
+    resetPlayerStats();
+    const spawn = getAimSpawn(state.mpSpawnIndex || 0);
+    placePlayer(spawn);
+    if (mpSocket && mpSocket.connected) {
+        mpSocket.emit('respawn', { x: spawn.x, y: spawn.y, z: spawn.z });
+    }
+}
+
+function applyPlayerDamage(amount) {
+    state.health -= amount;
+    updateHUD();
+    showDamageOverlay();
+    if (state.health <= 0) {
+        if (state.isMultiplayer) {
+            state.health = 0;
+            updateHUD();
+            if (mpRespawnTimeout) clearTimeout(mpRespawnTimeout);
+            mpRespawnTimeout = setTimeout(respawnLocalPlayer, 1200);
+        } else {
+            gameOver();
+        }
+    }
+}
+
+function resetGame(options = {}) {
+    const { skipEnemies = false, position = null } = options;
+    
+    resetPlayerStats();
+    state.kills = 0;
     state.bombPlanted = false;
     state.bombTimer = 0;
     state.bombDefuseTimer = 0;
     state.bombPosition = null;
     state.regenTimer = 0;
-    
-    // Reset weapons
-    weaponGroup.visible = true;
-    sniperGroup.visible = false;
-    document.getElementById('weapon-name').textContent = 'AK-47';
-    document.getElementById('scope-overlay').classList.remove('active');
-    document.getElementById('bomb-status').style.display = 'none';
-    camera.fov = 75;
-    camera.updateProjectionMatrix();
+    state.enemyDefusing = false;
     
     // Remove bomb if exists
     if (bombMesh) { scene.remove(bombMesh); bombMesh = null; }
     if (bombLight) { scene.remove(bombLight); bombLight = null; }
     
-    camera.position.set(0, CONFIG.player.height, 20);
-    updateHUD();
+    const spawnPos = position || new THREE.Vector3(0, CONFIG.player.height, 20);
+    placePlayer(spawnPos);
     
     // Reset enemies
-    enemies.forEach(e => {
-        if (!e.isAlive) {
-            e.respawn();
-        }
-        e.health = e.maxHealth;
-        e.state = 'patrol';
-    });
+    if (!skipEnemies) {
+        enemies.forEach(e => {
+            if (!scene.children.includes(e.group)) scene.add(e.group);
+            if (!e.isAlive) {
+                e.respawn();
+            }
+            e.health = e.maxHealth;
+            e.state = 'patrol';
+            e.group.visible = true;
+        });
+    } else {
+        enemies.forEach(e => e.group.visible = false);
+    }
+    
+    document.getElementById('bomb-status').style.display = 'none';
 }
 
 // ==================== INPUT HANDLING ====================
@@ -2309,6 +2513,7 @@ document.addEventListener('keydown', (e) => {
         case 'KeyA': state.moveLeft = true; break;
         case 'KeyD': state.moveRight = true; break;
         case 'Space':
+            state.jumpHeld = true;
             if (state.isGrounded) {
                 state.velocity.y = CONFIG.player.jumpForce;
                 state.isGrounded = false;
@@ -2331,6 +2536,7 @@ document.addEventListener('keyup', (e) => {
         case 'KeyA': state.moveLeft = false; break;
         case 'KeyD': state.moveRight = false; break;
         case 'ShiftLeft': state.isSprinting = false; break;
+        case 'Space': state.jumpHeld = false; break;
     }
 });
 
@@ -2362,17 +2568,8 @@ setInterval(() => {
     }
 }, CONFIG.weapon.fireRate);
 
-// Play button
-document.getElementById('play-btn').addEventListener('click', () => {
-    resetGame();
-    
-    // Reset menu text
-    document.getElementById('menu').querySelector('h1').textContent = 'Standoff';
-    document.getElementById('menu').querySelector('p').textContent = 'Browser FPS Prototype';
-    document.getElementById('play-btn').textContent = 'ИГРАТЬ';
-    
+function enterGameUI() {
     if (isMobile) {
-        // Mobile: skip pointer lock, just start game
         controls.isLocked = true;
         state.isPlaying = true;
         document.getElementById('menu').style.display = 'none';
@@ -2380,18 +2577,96 @@ document.getElementById('play-btn').addEventListener('click', () => {
         document.getElementById('crosshair').style.display = 'block';
         document.getElementById('mobile-controls').classList.add('active');
     } else {
-        // Desktop: use pointer lock
         controls.lock();
         state.isPlaying = true;
         document.getElementById('menu').style.display = 'none';
         document.getElementById('hud').style.display = 'block';
         document.getElementById('crosshair').style.display = 'block';
     }
+}
+
+// Play button
+document.getElementById('play-btn').addEventListener('click', () => {
+    state.isMultiplayer = false;
+    state.isSearchingMatch = false;
+    state.mpOpponentId = null;
+    state.mpRoom = null;
+    state.mpSpawnIndex = 0;
+    disconnectMultiplayer();
+    resetRemotePlayers();
+    createDefaultMap();
+    resetGame();
+    
+    // Reset menu text
+    document.getElementById('menu').querySelector('h1').textContent = 'Standoff';
+    document.getElementById('menu').querySelector('p').textContent = 'Browser FPS Prototype';
+    document.getElementById('play-btn').textContent = 'ИГРАТЬ';
+    const mpBtn = document.getElementById('mp-btn');
+    if (mpBtn) mpBtn.textContent = 'Играть мультиплеер 1v1';
+    
+    enterGameUI();
 });
 
-// Multiplayer toggle button
+function startMultiplayer() {
+    state.isMultiplayer = true;
+    state.isSearchingMatch = true;
+    state.mpOpponentId = null;
+    state.mpRoom = null;
+    state.mpSpawnIndex = 0;
+    if (mpRespawnTimeout) {
+        clearTimeout(mpRespawnTimeout);
+        mpRespawnTimeout = null;
+    }
+    createAimMap();
+    resetRemotePlayers();
+    resetGame({ skipEnemies: true, position: getAimSpawn(state.mpSpawnIndex || 0) });
+    document.getElementById('menu').querySelector('h1').textContent = 'Standoff 1v1';
+    document.getElementById('menu').querySelector('p').textContent = 'Aim карта для дуэлей';
+    const btn = document.getElementById('mp-btn');
+    if (btn) btn.textContent = 'Поиск соперника...';
+    enterGameUI();
+    if (mpSocket && mpSocket.connected) {
+        joinMatchmaking();
+    } else {
+        connectMultiplayer();
+    }
+}
+
+function leaveMultiplayer() {
+    state.isMultiplayer = false;
+    state.isSearchingMatch = false;
+    state.mpOpponentId = null;
+    state.mpRoom = null;
+    state.mpSpawnIndex = 0;
+    if (mpRespawnTimeout) {
+        clearTimeout(mpRespawnTimeout);
+        mpRespawnTimeout = null;
+    }
+    disconnectMultiplayer();
+    resetRemotePlayers();
+    createDefaultMap();
+    resetGame();
+    enemies.forEach(e => e.group.visible = true);
+    const menu = document.getElementById('menu');
+    menu.querySelector('h1').textContent = 'Standoff';
+    menu.querySelector('p').textContent = 'Браузерный шутер';
+    state.isPlaying = false;
+    if (!isMobile) document.exitPointerLock();
+    document.getElementById('menu').style.display = 'flex';
+    document.getElementById('hud').style.display = 'none';
+    document.getElementById('crosshair').style.display = 'none';
+    document.getElementById('mobile-controls').classList.remove('active');
+    const btn = document.getElementById('mp-btn');
+    if (btn) btn.textContent = 'Играть мультиплеер 1v1';
+}
+
+// Multiplayer button
 document.getElementById('mp-btn').addEventListener('click', () => {
-    toggleMultiplayer();
+    if (state.isMultiplayer) {
+        leaveMultiplayer();
+    } else {
+        startMultiplayer();
+    }
 });
 
 // Window resize
@@ -2423,17 +2698,21 @@ function animate() {
             }
         }
         
-        // Update enemies
-        enemies.forEach(enemy => {
-            enemy.update(delta, camera.position);
-        });
+        // Update enemies (singleplayer only)
+        if (!state.isMultiplayer) {
+            enemies.forEach(enemy => {
+                enemy.update(delta, camera.position);
+            });
+        }
     }
     
     updateParticles(delta);
     updateTracers(delta);
     updateGrenades(delta);
-    updateBomb(delta);
-    updatePeers(delta);
+    if (!state.isMultiplayer) {
+        updateBomb(delta);
+    }
+    updateRemotePlayers(delta);
     
     // Mobile joystick movement
     if (isMobile && controls.isLocked) {
@@ -2724,6 +3003,8 @@ function setupMobileControls() {
     // Look area
     lookArea.addEventListener('touchstart', (e) => {
         e.preventDefault();
+        // Не перехватываем второй палец, если уже крутим камерой
+        if (lookTouch.active) return;
         const touch = e.changedTouches[0];
         lookTouch.active = true;
         lookTouch.id = touch.identifier;
@@ -2741,19 +3022,26 @@ function setupMobileControls() {
         lookTouch.lastX = touch.clientX;
         lookTouch.lastY = touch.clientY;
         
-        controls.euler.y -= dx * 0.004;
-        controls.euler.x -= dy * 0.004;
+        const sens = 0.0035;
+        const maxStep = 0.06;
+        const stepYaw = THREE.MathUtils.clamp(dx * sens, -maxStep, maxStep);
+        const stepPitch = THREE.MathUtils.clamp(dy * sens, -maxStep, maxStep);
+        controls.euler.y -= stepYaw;
+        controls.euler.x -= stepPitch;
         controls.euler.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, controls.euler.x));
         camera.quaternion.setFromEuler(controls.euler);
     }, { passive: false });
     
-    document.addEventListener('touchend', (e) => {
+    const clearLookTouch = (e) => {
         if (!lookTouch.active) return;
-        const ended = Array.from(e.changedTouches).some(t => t.identifier === lookTouch.id);
+        const ended = Array.from(e.changedTouches || []).some(t => t.identifier === lookTouch.id);
         if (ended) {
             lookTouch.active = false;
+            lookTouch.id = null;
         }
-    });
+    };
+    document.addEventListener('touchend', clearLookTouch);
+    document.addEventListener('touchcancel', clearLookTouch);
     
     // Action buttons
     document.getElementById('btn-shoot').addEventListener('touchstart', (e) => {
@@ -2940,38 +3228,156 @@ function loadCrosshairConfig() {
 }
 let crosshairConfig = loadCrosshairConfig();
 
-// ==================== MULTIPLAYER (SIMPLE ALL-IN-ONE ROOM) ====================
+// ==================== MULTIPLAYER (1v1 AIM) ====================
 const MP_URL = 'wss://your-ws-server.example.com'; // TODO: замени на адрес Railway/Render/Fly
 let mpSocket = null;
 let mpSendInterval = null;
-const peers = new Map(); // id -> { mesh, target }
+const remotePlayers = new Map();
 
-function createPeerMesh(color = 0x00bcd4) {
-    const geo = new THREE.BoxGeometry(0.8, 1.6, 0.8);
-    const mat = new THREE.MeshLambertMaterial({ color, opacity: 0.8, transparent: true });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.castShadow = true;
-    mesh.position.y = 0.8;
-    scene.add(mesh);
-    return mesh;
+function createRemotePlayer(color = 0x4ade80) {
+    const group = new THREE.Group();
+    
+    const torsoGeo = new THREE.CylinderGeometry(0.35, 0.4, 1.1, 8);
+    const body = new THREE.Mesh(torsoGeo, new THREE.MeshLambertMaterial({ color }));
+    body.position.y = 1;
+    body.castShadow = true;
+    group.add(body);
+    
+    const headGeo = new THREE.SphereGeometry(0.25, 8, 8);
+    const head = new THREE.Mesh(headGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }));
+    head.position.y = 1.8;
+    head.castShadow = true;
+    head.name = 'head';
+    group.add(head);
+    
+    // Weapon
+    const weaponGroup = new THREE.Group();
+    const gunBody = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06, 0.08, 0.4),
+        materials.metal
+    );
+    gunBody.position.z = -0.2;
+    weaponGroup.add(gunBody);
+    
+    const gunBarrel = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.015, 0.02, 0.25, 6),
+        materials.metal
+    );
+    gunBarrel.rotation.x = Math.PI / 2;
+    gunBarrel.position.z = -0.5;
+    weaponGroup.add(gunBarrel);
+    
+    const muzzleFlash = new THREE.PointLight(0xffaa00, 0, 3);
+    muzzleFlash.position.z = -0.6;
+    weaponGroup.add(muzzleFlash);
+    weaponGroup.position.set(0.3, 1.1, 0);
+    group.add(weaponGroup);
+    
+    // Health bar
+    const hbBgGeo = new THREE.PlaneGeometry(0.8, 0.08);
+    const hbBgMat = new THREE.MeshBasicMaterial({ color: 0x333333, side: THREE.DoubleSide });
+    const healthBarBg = new THREE.Mesh(hbBgGeo, hbBgMat);
+    healthBarBg.position.y = 2.3;
+    group.add(healthBarBg);
+    
+    const hbFillGeo = new THREE.PlaneGeometry(0.78, 0.06);
+    const hbFillMat = new THREE.MeshBasicMaterial({ color: 0x4ade80, side: THREE.DoubleSide });
+    const healthBarFill = new THREE.Mesh(hbFillGeo, hbFillMat);
+    healthBarFill.position.y = 2.3;
+    healthBarFill.position.z = 0.01;
+    group.add(healthBarFill);
+    
+    group.position.y = 0;
+    scene.add(group);
+    
+    return {
+        group,
+        body,
+        head,
+        healthBarBg,
+        healthBarFill,
+        muzzleFlash,
+        target: { pos: new THREE.Vector3(), rotY: 0 },
+        health: CONFIG.player.health,
+        maxHealth: CONFIG.player.health,
+        isAlive: true
+    };
 }
 
-function getPeer(id) {
-    let p = peers.get(id);
+function getRemotePlayer(id) {
+    let p = remotePlayers.get(id);
     if (!p) {
-        const mesh = createPeerMesh();
-        p = { mesh, target: { pos: new THREE.Vector3(), rotY: 0 } };
-        peers.set(id, p);
+        p = createRemotePlayer();
+        remotePlayers.set(id, p);
     }
     return p;
 }
 
-function removePeer(id) {
-    const p = peers.get(id);
+function removeRemotePlayer(id) {
+    const p = remotePlayers.get(id);
     if (p) {
-        scene.remove(p.mesh);
-        peers.delete(id);
+        scene.remove(p.group);
+        remotePlayers.delete(id);
     }
+}
+
+function resetRemotePlayers() {
+    Array.from(remotePlayers.keys()).forEach(id => removeRemotePlayer(id));
+}
+
+function applyRemoteDamage(id, damage, isHeadshot = false) {
+    const p = remotePlayers.get(id);
+    if (!p || !p.isAlive) return;
+    p.health = Math.max(0, p.health - damage);
+    const healthPercent = p.health / p.maxHealth;
+    p.healthBarFill.scale.x = Math.max(0, healthPercent);
+    p.healthBarFill.position.x = (1 - healthPercent) * -0.39;
+    if (p.health <= 0) {
+        p.isAlive = false;
+        p.group.visible = false;
+        state.kills++;
+        updateHUD();
+    }
+}
+
+function handleHitEvent({ shooterId, targetId, damage }) {
+    if (!state.isMultiplayer) return;
+    const dmg = Number(damage) || 0;
+    if (mpSocket && targetId === mpSocket.id) {
+        applyPlayerDamage(dmg);
+    } else {
+        applyRemoteDamage(targetId, dmg);
+    }
+}
+
+function handleRemoteRespawn({ id, x, y, z }) {
+    const p = getRemotePlayer(id);
+    p.health = p.maxHealth;
+    p.isAlive = true;
+    p.group.visible = true;
+    p.healthBarFill.scale.x = 1;
+    p.healthBarFill.position.x = 0;
+    p.group.position.set(x, y, z);
+    p.target.pos.set(x, y, z);
+    p.target.rotY = 0;
+}
+
+function handleRemoteState(data) {
+    if (!state.isMultiplayer) return;
+    const { id, x, y, z, rotY } = data;
+    if (mpSocket && id === mpSocket.id) return;
+    const p = getRemotePlayer(id);
+    p.target.pos.set(x, y, z);
+    p.target.rotY = rotY || 0;
+}
+
+function handleRemoteShoot({ id }) {
+    if (!state.isMultiplayer) return;
+    if (mpSocket && id === mpSocket.id) return;
+    const p = remotePlayers.get(id);
+    if (!p) return;
+    p.muzzleFlash.intensity = 2;
+    setTimeout(() => { p.muzzleFlash.intensity = 0; }, 60);
 }
 
 function connectMultiplayer() {
@@ -2980,53 +3386,64 @@ function connectMultiplayer() {
     mpSocket = io(MP_URL, { transports: ['websocket'] });
 
     mpSocket.on('connect', () => {
-        console.log('MP connected');
         if (mpSendInterval) clearInterval(mpSendInterval);
         mpSendInterval = setInterval(sendPlayerState, 50); // 20 tps
-        const btn = document.getElementById('mp-btn');
-        if (btn) btn.textContent = 'Выйти из мультиплеера';
+        if (state.isMultiplayer) {
+            joinMatchmaking();
+        }
     });
 
     mpSocket.on('disconnect', () => {
-        console.log('MP disconnected');
         if (mpSendInterval) { clearInterval(mpSendInterval); mpSendInterval = null; }
-        peers.forEach((_, id) => removePeer(id));
+        resetRemotePlayers();
+        state.isSearchingMatch = false;
         const btn = document.getElementById('mp-btn');
-        if (btn) btn.textContent = 'Мультиплеер (beta)';
+        if (btn) btn.textContent = 'Играть мультиплеер 1v1';
+        mpSocket = null;
     });
 
-    mpSocket.on('state', (data) => {
-        const { id, x, y, z, rotY } = data;
-        if (mpSocket && id === mpSocket.id) return; // ignore self
-        const p = getPeer(id);
-        p.target.pos.set(x, y, z);
-        p.target.rotY = rotY || 0;
+    mpSocket.on('waiting', () => {
+        state.isSearchingMatch = true;
+        const btn = document.getElementById('mp-btn');
+        if (btn) btn.textContent = 'Поиск соперника...';
     });
 
-    mpSocket.on('shoot', (data) => {
-        const { id } = data;
-        if (mpSocket && id === mpSocket.id) return;
-        // можно добавить вспышку / звук у чужого игрока
+    mpSocket.on('matchFound', ({ room, spawnIndex = 0, opponentId }) => {
+        state.mpRoom = room;
+        state.mpSpawnIndex = spawnIndex;
+        state.mpOpponentId = opponentId || null;
+        state.isSearchingMatch = false;
+        const spawn = getAimSpawn(spawnIndex);
+        resetGame({ skipEnemies: true, position: spawn });
+        const btn = document.getElementById('mp-btn');
+        if (btn) btn.textContent = 'Играем 1v1';
     });
 
-    mpSocket.on('leave', ({ id }) => removePeer(id));
+    mpSocket.on('state', handleRemoteState);
+    mpSocket.on('shoot', handleRemoteShoot);
+    mpSocket.on('hit', handleHitEvent);
+    mpSocket.on('respawn', handleRemoteRespawn);
+    mpSocket.on('leave', ({ id }) => removeRemotePlayer(id));
 }
 
 function disconnectMultiplayer() {
     if (mpSendInterval) { clearInterval(mpSendInterval); mpSendInterval = null; }
     if (mpSocket) { mpSocket.disconnect(); mpSocket = null; }
-    peers.forEach((_, id) => removePeer(id));
+    resetRemotePlayers();
     const btn = document.getElementById('mp-btn');
-    if (btn) btn.textContent = 'Мультиплеер (beta)';
+    if (btn) btn.textContent = 'Играть мультиплеер 1v1';
 }
 
-function toggleMultiplayer() {
-    if (mpSocket) disconnectMultiplayer();
-    else connectMultiplayer();
+function joinMatchmaking() {
+    if (!mpSocket || !mpSocket.connected) return;
+    state.isSearchingMatch = true;
+    const btn = document.getElementById('mp-btn');
+    if (btn) btn.textContent = 'Поиск соперника...';
+    mpSocket.emit('join1v1');
 }
 
 function sendPlayerState() {
-    if (!mpSocket || !mpSocket.connected) return;
+    if (!mpSocket || !mpSocket.connected || !state.isMultiplayer || !state.isPlaying) return;
     mpSocket.emit('state', {
         x: camera.position.x,
         y: camera.position.y,
@@ -3035,10 +3452,15 @@ function sendPlayerState() {
     });
 }
 
-function updatePeers(delta) {
-    peers.forEach((p) => {
-        p.mesh.position.lerp(p.target.pos, Math.min(1, delta * 10));
-        p.mesh.rotation.y = THREE.MathUtils.lerp(p.mesh.rotation.y, p.target.rotY, Math.min(1, delta * 10));
+function updateRemotePlayers(delta) {
+    if (!state.isMultiplayer) return;
+    remotePlayers.forEach((p) => {
+        p.group.position.lerp(p.target.pos, Math.min(1, delta * 10));
+        p.group.rotation.y = THREE.MathUtils.lerp(p.group.rotation.y, p.target.rotY, Math.min(1, delta * 10));
+        if (p.healthBarBg && p.healthBarFill) {
+            p.healthBarBg.lookAt(camera.position);
+            p.healthBarFill.lookAt(camera.position);
+        }
     });
 }
 
