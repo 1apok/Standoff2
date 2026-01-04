@@ -73,6 +73,13 @@
         #cheat-panel.active { display: flex; flex-direction: column; }
         .cheat-row { display: flex; align-items: center; gap: 8px; }
         .cheat-row input { transform: scale(1.1); }
+        .cheat-slider {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+        }
+        .cheat-slider input[type=range] { flex: 1; }
         @keyframes unlockPulse {
             0% { box-shadow: 0 0 0 rgba(74,222,128,0.0); }
             50% { box-shadow: 0 0 20px rgba(74,222,128,0.8); }
@@ -533,6 +540,11 @@
                     <input type="checkbox" id="cheat-speed">
                     <label for="cheat-speed">Скорость x2</label>
                 </div>
+                <div class="cheat-slider">
+                    <label for="cheat-speed-mul">Множитель</label>
+                    <input type="range" id="cheat-speed-mul" min="1" max="5" step="0.1" value="2">
+                    <span id="cheat-speed-mul-val">2.0x</span>
+                </div>
                 <div class="cheat-row">
                     <input type="checkbox" id="cheat-fly">
                     <label for="cheat-fly">Fly</label>
@@ -552,6 +564,10 @@
                 <div class="cheat-row">
                     <input type="checkbox" id="cheat-esp">
                     <label for="cheat-esp">ESP подсветка</label>
+                </div>
+                <div class="cheat-row">
+                    <input type="checkbox" id="cheat-aimbot">
+                    <label for="cheat-aimbot">Aimbot</label>
                 </div>
             </div>
         </div>
@@ -710,6 +726,7 @@
         </div>
         <div id="btn-shoot" class="mobile-btn" data-ctrl="shoot"></div>
         <div id="btn-jump" class="mobile-btn" data-ctrl="jump"></div>
+        <div id="btn-crouch" class="mobile-btn" data-ctrl="crouch">↓</div>
         <div id="btn-reload" class="mobile-btn" data-ctrl="reload"></div>
         <div id="btn-grenade" class="mobile-btn" data-ctrl="grenade"></div>
         <div id="btn-weapon" class="mobile-btn" data-ctrl="weapon"></div>
@@ -820,12 +837,15 @@ const state = {
         infiniteAmmo: false,
         noRecoil: false,
         speedBoost: false,
+        speedMultiplier: 2,
         fly: false,
         noclip: false,
         wallbang: false,
         rapidFire: false,
-        esp: false
+        esp: false,
+        aimbot: false
     },
+    cheatsUnlocked: false,
     // Bomb state
     bombPlanted: false,
     bombPosition: null,
@@ -1103,6 +1123,11 @@ function createAimMap() {
     stack(2, 8, 1, 1.4, 1.2, 1.4);
     stack(-10, 0, 1, 1.6, 1.4, 1.6);
     stack(10, 0, 1, 1.6, 1.4, 1.6);
+    // Extra cover for 1v1 variety
+    stack(-6, 2, 2, 2.0, 1.6, 2.0);
+    stack(6, -2, 2, 2.0, 1.6, 2.0);
+    stack(-9, -9, 1, 1.8, 1.4, 1.8);
+    stack(9, 9, 1, 1.8, 1.4, 1.8);
 }
 
 createDefaultMap();
@@ -1743,7 +1768,7 @@ function createTracer(start, end) {
     const geo = new THREE.BufferGeometry().setFromPoints(points);
     const mat = new THREE.LineBasicMaterial({ color: 0xffff00, transparent: true, opacity: 1 });
     const line = new THREE.Line(geo, mat);
-    line.life = (state.cheats.enabled && state.cheats.rapidFire) ? 0.03 : 0.1;
+    line.life = (state.cheats.enabled && state.cheats.rapidFire) ? 0.02 : 0.1;
     scene.add(line);
     tracers.push(line);
 }
@@ -1779,6 +1804,45 @@ function updateESPForActor(actor) {
         head.material.depthWrite = !active;
         head.renderOrder = active ? 999 : 0;
     }
+}
+
+function getAimbotDirection(isSniper) {
+    // Choose closest target by angle; prefer heads
+    const candidates = [];
+    if (!state.isMultiplayer) {
+        enemies.filter(e => e.isAlive).forEach(e => {
+            candidates.push({ pos: e.head ? e.head.getWorldPosition(new THREE.Vector3()) : e.group.position.clone().setY(1.6) });
+        });
+    }
+    remotePlayers.forEach((p, id) => {
+        if (p.isAlive && id !== (mpSocket && mpSocket.id)) {
+            const pos = p.head ? p.head.getWorldPosition(new THREE.Vector3()) : p.group.position.clone().setY(1.6);
+            candidates.push({ pos });
+        }
+    });
+    if (candidates.length === 0) return null;
+    const camPos = camera.position.clone();
+    const viewDir = new THREE.Vector3();
+    camera.getWorldDirection(viewDir);
+    let best = null;
+    candidates.forEach(c => {
+        const dir = c.pos.clone().sub(camPos);
+        const dist = dir.length();
+        if (dist < 1) return;
+        dir.normalize();
+        const angle = viewDir.angleTo(dir);
+        if (angle > Math.PI / 3) return; // FOV limit ~60 deg
+        // If wallbang off, ensure line of sight
+        if (!(state.cheats.enabled && state.cheats.wallbang)) {
+            const rc = new THREE.Raycaster(camPos, dir);
+            const hitWall = rc.intersectObjects(colliders.map(c => c.mesh));
+            if (hitWall.length && hitWall[0].distance < dist - 0.2) return;
+        }
+        if (!best || angle < best.angle) {
+            best = { dir, angle };
+        }
+    });
+    return best ? best.dir : null;
 }
 
 // ==================== GRENADES ====================
@@ -2073,13 +2137,23 @@ function shoot() {
     // Raycast
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
     
+    // Aimbot direction override
+    let aimDirection = null;
+    if (state.cheats.enabled && state.cheats.aimbot) {
+        aimDirection = getAimbotDirection(isSniper);
+    }
+    
     // Get shoot direction with spread (no spread when scoped)
     const spreadBase = state.isScoped ? 0 : state.crosshairSpread * 0.001;
-    const spread = noRecoil ? 0 : spreadBase;
-    const direction = raycaster.ray.direction.clone();
-    direction.x += (Math.random() - 0.5) * spread;
-    direction.y += (Math.random() - 0.5) * spread;
-    direction.z += (Math.random() - 0.5) * spread;
+    const spread = (noRecoil || aimDirection) ? 0 : spreadBase;
+    let direction = raycaster.ray.direction.clone();
+    if (aimDirection) {
+        direction.copy(aimDirection);
+    } else {
+        direction.x += (Math.random() - 0.5) * spread;
+        direction.y += (Math.random() - 0.5) * spread;
+        direction.z += (Math.random() - 0.5) * spread;
+    }
     raycaster.ray.direction.copy(direction.normalize());
     
     // Check enemy hits (body + head) and remote players
@@ -2163,7 +2237,7 @@ function shoot() {
     
     createTracer(start, end);
     
-    // Fire rate cooldown
+    // Fire rate cooldown (rapid fire cheat makes any gun fire extremely fast)
     setTimeout(() => {
         state.canShoot = true;
     }, (state.cheats.enabled && state.cheats.rapidFire) ? 20 : cfg.fireRate);
@@ -2324,7 +2398,7 @@ function updatePlayer(delta) {
     if (!controls.isLocked) return;
     
     let speed = CONFIG.player.speed * (state.isSprinting ? CONFIG.player.sprintMultiplier : 1);
-    if (state.cheats.enabled && state.cheats.speedBoost) speed *= 1.8;
+    if (state.cheats.enabled && state.cheats.speedBoost) speed *= (state.cheats.speedMultiplier || 2);
     
     // Get movement direction
     const forward = new THREE.Vector3();
@@ -2678,11 +2752,7 @@ document.addEventListener('keydown', (e) => {
             }
             break;
         case 'ShiftLeft':
-            if (state.cheats.enabled && state.cheats.fly) {
-                state.flyDown = true;
-            } else {
-                state.isSprinting = true;
-            }
+            state.isSprinting = true;
             break;
         case 'ControlLeft':
             if (state.cheats.enabled && state.cheats.fly) state.flyDown = true;
@@ -2704,7 +2774,6 @@ document.addEventListener('keyup', (e) => {
         case 'KeyD': state.moveRight = false; break;
         case 'ShiftLeft':
             state.isSprinting = false;
-            state.flyDown = false;
             break;
         case 'ControlLeft':
             state.flyDown = false;
@@ -2737,9 +2806,12 @@ document.addEventListener('mouseup', (e) => {
 // Prevent context menu on right click
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 
-// Auto-fire while holding (only for rifle)
+// Auto-fire while holding (rifle; sniper when rapid fire cheat)
 setInterval(() => {
-    if (isMouseDown && controls.isLocked && state.currentWeapon === 'rifle') {
+    if (!isMouseDown || !controls.isLocked) return;
+    if (state.currentWeapon === 'rifle') {
+        shoot();
+    } else if (state.currentWeapon === 'sniper' && state.cheats.enabled && state.cheats.rapidFire) {
         shoot();
     }
 }, CONFIG.weapon.fireRate);
@@ -2850,6 +2922,7 @@ document.getElementById('mp-btn').addEventListener('click', () => {
 });
 
 // Secret code / cheats
+const CHEATS_STORAGE_KEY = 'standoffCheatsV2';
 const secretInput = document.getElementById('secret-code');
 const cheatPanel = document.getElementById('cheat-panel');
 const cheatControls = [
@@ -2857,18 +2930,71 @@ const cheatControls = [
     { id: 'cheat-ammo', key: 'infiniteAmmo' },
     { id: 'cheat-recoil', key: 'noRecoil' },
     { id: 'cheat-speed', key: 'speedBoost' },
+    { id: 'cheat-speed-mul', key: 'speedMultiplier', isSlider: true },
     { id: 'cheat-fly', key: 'fly' },
     { id: 'cheat-noclip', key: 'noclip' },
     { id: 'cheat-wallbang', key: 'wallbang' },
     { id: 'cheat-rapid', key: 'rapidFire' },
-    { id: 'cheat-esp', key: 'esp' }
+    { id: 'cheat-esp', key: 'esp' },
+    { id: 'cheat-aimbot', key: 'aimbot' }
 ];
+
+function loadCheatsState() {
+    try {
+        const saved = localStorage.getItem(CHEATS_STORAGE_KEY);
+        if (saved) {
+            return JSON.parse(saved);
+        }
+    } catch (e) {}
+    return { unlocked: false, cheats: {} };
+}
+
+function saveCheatsState() {
+    try {
+        localStorage.setItem(CHEATS_STORAGE_KEY, JSON.stringify({
+            unlocked: state.cheatsUnlocked,
+            cheats: state.cheats
+        }));
+    } catch (e) {}
+}
+
+function applyCheatUIFromState() {
+    cheatControls.forEach(({ id, key }) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.type === 'range') {
+            el.value = state.cheats[key] || 2;
+            const valEl = document.getElementById('cheat-speed-mul-val');
+            if (valEl) valEl.textContent = `${parseFloat(el.value).toFixed(1)}x`;
+        } else {
+            el.checked = !!state.cheats[key];
+        }
+    });
+    if (state.cheatsUnlocked) {
+        cheatPanel.classList.add('active');
+        document.getElementById('secret-wrapper').classList.add('unlocked');
+    }
+}
+
+// Load cheats at startup
+const savedCheats = loadCheatsState();
+state.cheatsUnlocked = !!savedCheats.unlocked;
+if (savedCheats.cheats) {
+    Object.assign(state.cheats, savedCheats.cheats);
+}
+if (state.cheatsUnlocked) {
+    state.cheats.enabled = true;
+    applyCheatUIFromState();
+}
 
 function unlockCheats() {
     if (secretInput.value.trim() === 'Федя') {
         state.cheats.enabled = true;
+        state.cheatsUnlocked = true;
         cheatPanel.classList.add('active');
         document.getElementById('secret-wrapper').classList.add('unlocked');
+        saveCheatsState();
+        applyCheatUIFromState();
     }
 }
 
@@ -2883,7 +3009,13 @@ cheatControls.forEach(({ id, key }) => {
     const el = document.getElementById(id);
     if (!el) return;
     el.addEventListener('change', () => {
-        state.cheats[key] = !!el.checked;
+        if (el.type === 'range') {
+            state.cheats[key] = parseFloat(el.value) || 2;
+            const valEl = document.getElementById('cheat-speed-mul-val');
+            if (valEl) valEl.textContent = `${state.cheats[key].toFixed(1)}x`;
+        } else {
+            state.cheats[key] = !!el.checked;
+        }
         // Если нужны немедленные эффекты — например, заполнить магазины при бесконечных патронах
         if (key === 'infiniteAmmo' && state.cheats.infiniteAmmo) {
             state.ammo = CONFIG.weapon.magazineSize;
@@ -2895,6 +3027,7 @@ cheatControls.forEach(({ id, key }) => {
         if (key === 'esp') {
             updateESPHighlight();
         }
+        saveCheatsState();
     });
 });
 
@@ -2903,6 +3036,13 @@ window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Re-lock pointer after alt-tab / focus return
+window.addEventListener('focus', () => {
+    if (state.isPlaying && !controls.isLocked && !isMobile) {
+        controls.lock();
+    }
 });
 
 // ==================== GAME LOOP ====================
@@ -2962,7 +3102,8 @@ const defaultControls = {
     grenade: { y: 100, size: 45, right: 110 },
     weapon: { y: 160, size: 45, right: 110 },
     scope: { y: 190, size: 45, right: 30 },
-    bomb: { y: 250, size: 45, right: 30 }
+    bomb: { y: 250, size: 45, right: 30 },
+    crouch: { y: 220, size: 55, left: 30 }
 };
 
 function loadControlsConfig() {
@@ -3001,7 +3142,7 @@ function applyControlsConfig() {
 }
 
 // Button emoji labels
-var btnEmoji={shoot:String.fromCodePoint(0x1F52B),jump:String.fromCodePoint(0x2B06,0xFE0F),reload:String.fromCodePoint(0x1F504),grenade:String.fromCodePoint(0x1F4A5),weapon:String.fromCodePoint(0x1F500),scope:String.fromCodePoint(0x1F3AF),bomb:String.fromCodePoint(0x1F4A3)};function setButtonLabels(){for(var k in btnEmoji){var b=document.getElementById('btn-'+k);if(b)b.textContent=btnEmoji[k];}}
+var btnEmoji={shoot:String.fromCodePoint(0x1F52B),jump:String.fromCodePoint(0x2B06,0xFE0F),reload:String.fromCodePoint(0x1F504),grenade:String.fromCodePoint(0x1F4A5),weapon:String.fromCodePoint(0x1F500),scope:String.fromCodePoint(0x1F3AF),bomb:String.fromCodePoint(0x1F4A3),crouch:String.fromCodePoint(0x2B07,0xFE0F)};function setButtonLabels(){for(var k in btnEmoji){var b=document.getElementById('btn-'+k);if(b)b.textContent=btnEmoji[k];}}
 // Apply on load
 if(isMobile){window.addEventListener('load',function(){setButtonLabels();applyControlsConfig();});}
 
@@ -3307,6 +3448,15 @@ function setupMobileControls() {
     document.getElementById('btn-grenade').addEventListener('touchstart', (e) => {
         e.preventDefault();
         if (controls.isLocked) throwGrenade();
+    }, { passive: false });
+    
+    document.getElementById('btn-crouch').addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (state.cheats.enabled && state.cheats.fly) state.flyDown = true;
+    }, { passive: false });
+    document.getElementById('btn-crouch').addEventListener('touchend', (e) => {
+        e.preventDefault();
+        state.flyDown = false;
     }, { passive: false });
     
     document.getElementById('btn-weapon').addEventListener('touchstart', (e) => {
