@@ -3793,8 +3793,9 @@ function handleRemoteRespawn({ id, x, y, z }) {
     p.group.visible = true;
     p.healthBarFill.scale.x = 1;
     p.healthBarFill.position.x = 0;
-    p.group.position.set(x, y, z);
-    p.target.pos.set(x, y, z);
+    const yPos = Math.max(0, (typeof y === 'number' ? y - CONFIG.player.height : 0));
+    p.group.position.set(x, yPos, z);
+    p.target.pos.set(x, yPos, z);
     p.target.rotY = 0;
 }
 
@@ -3803,7 +3804,8 @@ function handleRemoteState(data) {
     const { id, x, y, z, rotY, health } = data;
     if (mpSocket && id === mpSocket.id) return;
     const p = getRemotePlayer(id);
-    p.target.pos.set(x, y, z);
+    const yPos = Math.max(0, (typeof y === 'number' ? y - CONFIG.player.height : 0));
+    p.target.pos.set(x, yPos, z);
     p.target.rotY = rotY || 0;
     if (typeof health === 'number') {
         p.health = Math.max(0, Math.min(p.maxHealth, health));
