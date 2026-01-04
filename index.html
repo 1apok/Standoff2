@@ -3229,17 +3229,8 @@ function loadCrosshairConfig() {
 let crosshairConfig = loadCrosshairConfig();
 
 // ==================== MULTIPLAYER (1v1 AIM) ====================
-// Авто-адрес сокет-сервера: по умолчанию тот же хост, порт 8080 (или подставь свой)
-// Можно передать кастомный адрес через window.MP_URL или ?mp=<ws(s)://...>
-const MP_URL = (() => {
-    const override = (window.MP_URL) || new URLSearchParams(window.location.search).get('mp');
-    if (override) return override;
-    const host = window.location.hostname || 'localhost';
-    const port = 8080;
-    const isHttps = window.location.protocol === 'https:';
-    const proto = isHttps ? 'wss' : 'ws';
-    return `${proto}://${host}:${port}`;
-})();
+// Фиксированный адрес сокет-сервера (Railway)
+const MP_URL = 'wss://standoff2-production.up.railway.app';
 let mpSocket = null;
 let mpSendInterval = null;
 const remotePlayers = new Map();
