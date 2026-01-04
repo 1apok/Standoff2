@@ -19,6 +19,8 @@
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             z-index: 1000;
+            overflow-y: auto;
+            padding: 20px 0;
         }
         #menu h1 {
             font-size: 72px; color: #e94560; text-transform: uppercase;
@@ -305,6 +307,7 @@
         .mobile #menu p { font-size: 12px; margin-bottom: 20px; }
         .mobile #play-btn { padding: 12px 30px; font-size: 16px; }
         .mobile #controls-info { display: none; }
+        .mobile #menu { justify-content: flex-start; padding-top: 30px; }
         
         /* Edit Controls Button */
         #edit-controls-btn {
@@ -326,6 +329,19 @@
         }
         #edit-hud-btn:hover { background: rgba(255,255,255,0.2); }
         .mobile #edit-hud-btn { display: block; }
+        #exit-btn {
+            position: fixed;
+            top: 14px; left: 14px;
+            z-index: 1200;
+            padding: 10px 14px;
+            font-size: 14px;
+            background: rgba(0,0,0,0.5);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            cursor: pointer;
+            display: none;
+        }
         
         #hud-editor {
             display: none;
@@ -740,6 +756,7 @@
         <div class="score-badge score-blue" id="score-me">You: 0</div>
         <div class="score-badge score-red" id="score-enemy">Enemy: 0</div>
     </div>
+    <button id="exit-btn">Выйти</button>
     
     <!-- Bomb status -->
     <div id="bomb-status"></div>
@@ -1448,17 +1465,19 @@ class Enemy {
         
         // Health bar background
         const hbBgGeo = new THREE.PlaneGeometry(0.8, 0.08);
-        const hbBgMat = new THREE.MeshBasicMaterial({ color: 0x333333, side: THREE.DoubleSide });
+        const hbBgMat = new THREE.MeshBasicMaterial({ color: 0x333333, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
         this.healthBarBg = new THREE.Mesh(hbBgGeo, hbBgMat);
         this.healthBarBg.position.y = 2.3;
+        this.healthBarBg.renderOrder = 5;
         this.group.add(this.healthBarBg);
         
         // Health bar fill
         const hbFillGeo = new THREE.PlaneGeometry(0.78, 0.06);
-        const hbFillMat = new THREE.MeshBasicMaterial({ color: 0xe94560, side: THREE.DoubleSide });
+        const hbFillMat = new THREE.MeshBasicMaterial({ color: 0xe94560, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
         this.healthBarFill = new THREE.Mesh(hbFillGeo, hbFillMat);
         this.healthBarFill.position.y = 2.3;
         this.healthBarFill.position.z = 0.01;
+        this.healthBarFill.renderOrder = 6;
         this.group.add(this.healthBarFill);
         
         this.group.position.set(x, 0, z);
@@ -1542,8 +1561,8 @@ class Enemy {
         
         // Update health bar
         const healthPercent = this.health / this.maxHealth;
-        this.healthBarFill.scale.x = healthPercent;
-        this.healthBarFill.position.x = (1 - healthPercent) * -0.39;
+        this.healthBarFill.scale.x = Math.max(0.001, healthPercent);
+        this.healthBarFill.position.x = (healthPercent - 1) * 0.39;
         
         const distToPlayer = this.group.position.distanceTo(playerPos);
         const canSee = this.canSeePlayer(playerPos);
@@ -2901,6 +2920,7 @@ document.getElementById('play-btn').addEventListener('click', () => {
     if (mpBtn) mpBtn.textContent = 'Играть мультиплеер 1v1';
     
     enterGameUI();
+    document.getElementById('exit-btn').style.display = 'block';
 });
 
 function ensureMatchmaking() {
@@ -2931,6 +2951,7 @@ function startMultiplayer() {
     enterGameUI();
     ensureMatchmaking();
     updateMpScore();
+    document.getElementById('exit-btn').style.display = 'block';
 }
 
 function leaveMultiplayer() {
@@ -2960,6 +2981,7 @@ function leaveMultiplayer() {
     const btn = document.getElementById('mp-btn');
     if (btn) btn.textContent = 'Играть мультиплеер 1v1';
     document.getElementById('mp-score').style.display = 'none';
+    document.getElementById('exit-btn').style.display = 'none';
 }
 
 // Multiplayer button
@@ -2969,6 +2991,22 @@ document.getElementById('mp-btn').addEventListener('click', () => {
     } else {
         startMultiplayer();
     }
+});
+
+// Exit button (leave match or back to menu)
+document.getElementById('exit-btn').addEventListener('click', () => {
+    if (state.isMultiplayer) {
+        leaveMultiplayer();
+    } else {
+        // Go to menu
+        state.isPlaying = false;
+        if (!isMobile) document.exitPointerLock();
+        document.getElementById('menu').style.display = 'flex';
+        document.getElementById('hud').style.display = 'none';
+        document.getElementById('crosshair').style.display = 'none';
+        document.getElementById('mobile-controls').classList.remove('active');
+    }
+    document.getElementById('exit-btn').style.display = 'none';
 });
 
 // Secret code / cheats
@@ -3397,10 +3435,10 @@ function setupMobileControls() {
         if (!moveJoystick.active) return;
         const touch = Array.from(e.touches).find(t => t.identifier === moveJoystick.id);
         if (!touch) return;
-        const rect = joystickMove.getBoundingClientRect();
-        const maxDist = rect.width * 0.35;
-        let dx = touch.clientX - moveJoystick.startX;
-        let dy = touch.clientY - moveJoystick.startY;
+    const rect = joystickMove.getBoundingClientRect();
+    const maxDist = rect.width * 0.35;
+    let dx = touch.clientX - moveJoystick.startX;
+    let dy = touch.clientY - moveJoystick.startY;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist > maxDist) {
             dx = dx / dist * maxDist;
@@ -3709,16 +3747,18 @@ function createRemotePlayer(color = 0x4ade80) {
     
     // Health bar
     const hbBgGeo = new THREE.PlaneGeometry(0.8, 0.08);
-    const hbBgMat = new THREE.MeshBasicMaterial({ color: 0x333333, side: THREE.DoubleSide });
+    const hbBgMat = new THREE.MeshBasicMaterial({ color: 0x333333, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
     const healthBarBg = new THREE.Mesh(hbBgGeo, hbBgMat);
     healthBarBg.position.y = 2.3;
+    healthBarBg.renderOrder = 5;
     group.add(healthBarBg);
     
     const hbFillGeo = new THREE.PlaneGeometry(0.78, 0.06);
-    const hbFillMat = new THREE.MeshBasicMaterial({ color: 0x4ade80, side: THREE.DoubleSide });
+    const hbFillMat = new THREE.MeshBasicMaterial({ color: 0x4ade80, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
     const healthBarFill = new THREE.Mesh(hbFillGeo, hbFillMat);
     healthBarFill.position.y = 2.3;
     healthBarFill.position.z = 0.01;
+    healthBarFill.renderOrder = 6;
     group.add(healthBarFill);
     
     group.position.y = 0;
@@ -3764,8 +3804,8 @@ function applyRemoteDamage(id, damage, isHeadshot = false) {
     if (!p || !p.isAlive) return;
     p.health = Math.max(0, p.health - damage);
     const healthPercent = p.health / p.maxHealth;
-    p.healthBarFill.scale.x = Math.max(0, healthPercent);
-    p.healthBarFill.position.x = (1 - healthPercent) * -0.39;
+    p.healthBarFill.scale.x = Math.max(0.001, healthPercent);
+    p.healthBarFill.position.x = (healthPercent - 1) * 0.39;
     if (p.health <= 0) {
         p.isAlive = false;
         p.group.visible = false;
