@@ -591,6 +591,7 @@
     </style>
 </head>
 <body>
+    <div id="admin-banner"></div>
     <div id="game-container"></div>
     
     <!-- Menu -->
@@ -3244,7 +3245,8 @@ if (adminSendBtn) {
         const msg = (adminMsgInput?.value || '').trim();
         if (!msg) return;
         showAdminBanner(msg);
-        if (mpSocket && mpSocket.connected) {
+        if (!mpSocket || !mpSocket.connected) connectMultiplayer();
+        if (mpSocket) {
             mpSocket.emit('adminMsg', { msg });
         }
     });
