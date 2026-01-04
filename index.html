@@ -3793,18 +3793,26 @@ function handleRemoteRespawn({ id, x, y, z }) {
     p.group.visible = true;
     p.healthBarFill.scale.x = 1;
     p.healthBarFill.position.x = 0;
-    p.group.position.set(x, 0, z);
-    p.target.pos.set(x, 0, z);
+    p.group.position.set(x, y, z);
+    p.target.pos.set(x, y, z);
     p.target.rotY = 0;
 }
 
 function handleRemoteState(data) {
     if (!state.isMultiplayer) return;
-    const { id, x, y, z, rotY } = data;
+    const { id, x, y, z, rotY, health } = data;
     if (mpSocket && id === mpSocket.id) return;
     const p = getRemotePlayer(id);
-    p.target.pos.set(x, 0, z);
+    p.target.pos.set(x, y, z);
     p.target.rotY = rotY || 0;
+    if (typeof health === 'number') {
+        p.health = Math.max(0, Math.min(p.maxHealth, health));
+        const hp = p.health / p.maxHealth;
+        p.healthBarFill.scale.x = hp;
+        p.healthBarFill.position.x = (1 - hp) * -0.39;
+        p.isAlive = p.health > 0;
+        p.group.visible = p.isAlive;
+    }
 }
 
 function handleRemoteShoot({ id }) {
@@ -3891,9 +3899,10 @@ function sendPlayerState() {
     if (!mpSocket || !mpSocket.connected || !state.isMultiplayer || !state.isPlaying) return;
     mpSocket.emit('state', {
         x: camera.position.x,
-        y: 0, // всегда на земле, чтобы не зависали модели
+        y: camera.position.y,
         z: camera.position.z,
         rotY: camera.rotation.y,
+        health: state.health
     });
 }
 
