@@ -287,30 +287,30 @@
         }
         #party-notification {
             position: fixed;
-            bottom: 100px;
+            bottom: 40px;
             left: 50%;
             transform: translateX(-50%);
-            padding: 12px 24px;
-            background: linear-gradient(135deg, rgba(236,72,153,0.9), rgba(139,92,246,0.9));
-            border-radius: 25px;
-            font-size: 18px;
+            font-size: 24px;
             font-weight: bold;
-            color: #fff;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            background: linear-gradient(90deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3, #1dd1a1, #ff6b6b);
+            background-size: 300% 100%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
             z-index: 10001;
             opacity: 0;
-            transition: opacity 0.5s ease, transform 0.5s ease;
+            transition: opacity 0.5s ease;
             pointer-events: none;
-            box-shadow: 0 4px 20px rgba(236,72,153,0.5);
+            text-shadow: none;
+            white-space: nowrap;
         }
         #party-notification.show {
             opacity: 1;
-            animation: partyNotifPulse 0.5s ease;
+            animation: partyTextShimmer 2s linear infinite;
         }
-        @keyframes partyNotifPulse {
-            0% { transform: translateX(-50%) scale(0.5); }
-            50% { transform: translateX(-50%) scale(1.1); }
-            100% { transform: translateX(-50%) scale(1); }
+        @keyframes partyTextShimmer {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 300% 50%; }
         }
         #admin-banner {
             position: fixed;
@@ -1205,6 +1205,7 @@ const state = {
     moveRight: false,
     isMoving: false,
     isSprinting: false,
+    isCrouching: false,
     jumpHeld: false,
     flyUp: false,
     flyDown: false,
@@ -3789,7 +3790,7 @@ function togglePartyMode(activatorName = 'Админ') {
         switchWeapon('rocketLauncher');
         
         // Show notification
-        notification.textContent = `🎆 ${activatorName} активировал праздник! 🎆`;
+        notification.textContent = 'Федя активировал праздник';
         notification.classList.add('show');
         setTimeout(() => notification.classList.remove('show'), 3000);
         
@@ -4163,6 +4164,7 @@ function updatePlayer(delta) {
     if (!state.isPlaying) return;
     
     let speed = CONFIG.player.speed * (state.isSprinting ? CONFIG.player.sprintMultiplier : 1);
+    if (state.isCrouching) speed *= 0.4; // Crouch = 40% speed
     if (state.cheats.enabled && state.cheats.speedBoost) speed *= (state.cheats.speedMultiplier || 2);
     
     // Get movement direction
@@ -4228,8 +4230,9 @@ function updatePlayer(delta) {
         state.velocity.y -= CONFIG.player.gravity * delta;
         camera.position.y += state.velocity.y * delta;
         
-        // Ground check
-        const groundY = getGroundHeight(camera.position.x, camera.position.z) + CONFIG.player.height;
+        // Ground check (crouch = lower camera)
+        const playerHeight = state.isCrouching ? CONFIG.player.height * 0.5 : CONFIG.player.height;
+        const groundY = getGroundHeight(camera.position.x, camera.position.z) + playerHeight;
         if (camera.position.y <= groundY) {
             camera.position.y = groundY;
             state.velocity.y = 0;
@@ -4584,7 +4587,12 @@ document.addEventListener('keydown', (e) => {
             state.isSprinting = true;
             break;
         case 'ControlLeft':
-            if (state.cheats.enabled && state.cheats.fly) state.flyDown = true;
+        case 'ControlRight':
+            if (state.cheats.enabled && state.cheats.fly) {
+                state.flyDown = true;
+            } else {
+                state.isCrouching = true;
+            }
             break;
         case 'KeyR': reload(); break;
         case 'KeyG': throwGrenade(); break;
@@ -4605,7 +4613,9 @@ document.addEventListener('keyup', (e) => {
             state.isSprinting = false;
             break;
         case 'ControlLeft':
+        case 'ControlRight':
             state.flyDown = false;
+            state.isCrouching = false;
             break;
         case 'Space':
             state.jumpHeld = false;
@@ -5263,10 +5273,13 @@ function animate() {
         updateCrosshair(delta);
         
         // Health regeneration (2 HP per second, starts after 3 seconds without damage)
+        // Crouching: faster regen (5 HP/s), starts after 1.5 seconds
         if (state.health < CONFIG.player.health && state.health > 0) {
             state.regenTimer = (state.regenTimer || 0) + delta;
-            if (state.regenTimer > 3) {
-                state.health = Math.min(CONFIG.player.health, state.health + 2 * delta);
+            const regenDelay = state.isCrouching ? 1.5 : 3;
+            const regenRate = state.isCrouching ? 5 : 2;
+            if (state.regenTimer > regenDelay) {
+                state.health = Math.min(CONFIG.player.health, state.health + regenRate * delta);
                 updateHUD();
             }
         }
@@ -5641,6 +5654,13 @@ function setupMobileControls() {
     document.getElementById('btn-jump').addEventListener('touchstart', (e) => {
         e.preventDefault();
         if (!controls.isLocked) return;
+        
+        // Fly mode - go up
+        if (state.cheats.enabled && state.cheats.fly) {
+            state.flyUp = true;
+            return;
+        }
+        
         if (state.isGrounded) {
             state.velocity.y = CONFIG.player.jumpForce;
             state.isGrounded = false;
@@ -5652,6 +5672,11 @@ function setupMobileControls() {
                 }
             } catch (e) {}
         }
+    }, { passive: false });
+    
+    document.getElementById('btn-jump').addEventListener('touchend', (e) => {
+        e.preventDefault();
+        state.flyUp = false;
     }, { passive: false });
     
     document.getElementById('btn-reload').addEventListener('touchstart', (e) => {
@@ -5666,11 +5691,16 @@ function setupMobileControls() {
     
     document.getElementById('btn-crouch').addEventListener('touchstart', (e) => {
         e.preventDefault();
-        if (state.cheats.enabled && state.cheats.fly) state.flyDown = true;
+        if (state.cheats.enabled && state.cheats.fly) {
+            state.flyDown = true;
+        } else {
+            state.isCrouching = true;
+        }
     }, { passive: false });
     document.getElementById('btn-crouch').addEventListener('touchend', (e) => {
         e.preventDefault();
         state.flyDown = false;
+        state.isCrouching = false;
     }, { passive: false });
     
     document.getElementById('btn-weapon').addEventListener('touchstart', (e) => {
