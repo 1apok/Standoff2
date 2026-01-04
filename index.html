@@ -866,8 +866,8 @@ class FPSControls {
     connect() {
         document.addEventListener('pointerlockchange', () => {
             this.isLocked = document.pointerLockElement === this.domElement;
-            // Не выбрасываем в меню при переключении вкладки/сворачивании
-            if (document.hidden) return;
+            // Не выбрасываем в меню при переключении вкладки/сворачивании/alt+tab
+            if (document.hidden || !document.hasFocus()) return;
             if (!this.isLocked && state.isPlaying && !isMobile) {
                 document.getElementById('menu').style.display = 'flex';
                 document.getElementById('hud').style.display = 'none';
@@ -1743,7 +1743,7 @@ function createTracer(start, end) {
     const geo = new THREE.BufferGeometry().setFromPoints(points);
     const mat = new THREE.LineBasicMaterial({ color: 0xffff00, transparent: true, opacity: 1 });
     const line = new THREE.Line(geo, mat);
-    line.life = (state.cheats.enabled && state.cheats.rapidFire) ? 0.05 : 0.1;
+    line.life = (state.cheats.enabled && state.cheats.rapidFire) ? 0.03 : 0.1;
     scene.add(line);
     tracers.push(line);
 }
@@ -1769,9 +1769,15 @@ function updateESPForActor(actor) {
     const color = active ? 0x00ffea : 0x000000;
     if (mesh && mesh.material && 'emissive' in mesh.material) {
         mesh.material.emissive.setHex(color);
+        mesh.material.depthTest = !active;
+        mesh.material.depthWrite = !active;
+        mesh.renderOrder = active ? 999 : 0;
     }
     if (head && head.material && 'emissive' in head.material) {
         head.material.emissive.setHex(color);
+        head.material.depthTest = !active;
+        head.material.depthWrite = !active;
+        head.renderOrder = active ? 999 : 0;
     }
 }
 
@@ -2160,7 +2166,7 @@ function shoot() {
     // Fire rate cooldown
     setTimeout(() => {
         state.canShoot = true;
-    }, (state.cheats.enabled && state.cheats.rapidFire) ? 40 : cfg.fireRate);
+    }, (state.cheats.enabled && state.cheats.rapidFire) ? 20 : cfg.fireRate);
     
     // Restore ammo if infinite
     if (infiniteAmmo) {
