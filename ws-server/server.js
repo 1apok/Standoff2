@@ -11,6 +11,15 @@ let ffaCounter = 0;
 let teamCounter = 0;
 const sandboxObjects = [];
 
+function removeSandboxObject(id) {
+  const idx = sandboxObjects.findIndex(o => o.id === id);
+  if (idx !== -1) {
+    sandboxObjects.splice(idx, 1);
+    return true;
+  }
+  return false;
+}
+
 function leaveMatch(socket) {
   if (waitingSocket && waitingSocket.id === socket.id) {
     waitingSocket = null;
@@ -112,9 +121,17 @@ io.on('connection', (socket) => {
   socket.on('sandboxPlace', (data) => {
     const room = socket.data?.room;
     if (room !== 'sandbox') return;
-    const obj = { ...data, id: socket.id };
+    const obj = { ...data, owner: socket.id };
     sandboxObjects.push(obj);
     socket.to(room).emit('sandboxPlace', obj);
+  });
+
+  socket.on('sandboxRemove', ({ id }) => {
+    const room = socket.data?.room;
+    if (room !== 'sandbox') return;
+    if (removeSandboxObject(id)) {
+      io.to(room).emit('sandboxRemove', { id });
+    }
   });
 
   socket.on('sandboxClear', () => {

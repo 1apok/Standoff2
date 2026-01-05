@@ -1559,6 +1559,8 @@
         <div id="btn-weapon" class="mobile-btn" data-ctrl="weapon"></div>
         <div id="btn-scope" class="mobile-btn" data-ctrl="scope"></div>
         <div id="btn-bomb" class="mobile-btn" data-ctrl="bomb">?</div>
+        <div id="btn-hammer" class="mobile-btn" data-ctrl="hammer">🔨</div>
+        <div id="admin-mobile-btn" class="mobile-btn" style="display:none;">🛠️</div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -1637,6 +1639,7 @@ const state = {
     mpTeam: null,
     health: CONFIG.player.health,
     currentWeapon: 'rifle', // rifle, sniper or knife
+    savedWeaponBeforeHammer: null,
     ammo: CONFIG.weapon.magazineSize,
     reserveAmmo: CONFIG.weapon.reserveAmmo,
     sniperAmmo: CONFIG.sniper.magazineSize,
@@ -1732,6 +1735,16 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.getElementById('game-container').appendChild(renderer.domElement);
 
+// Explicit click-to-lock for desktop
+const gameContainer = document.getElementById('game-container');
+if (gameContainer) {
+    gameContainer.addEventListener('click', () => {
+        if (!isMobile && state.isPlaying && !mapEditor.active && !isSandboxPanelOpen()) {
+            (renderer?.domElement || gameContainer)?.requestPointerLock?.();
+        }
+    });
+}
+
 // ==================== AUDIO ====================
 function loadSounds() {
     try {
@@ -1788,8 +1801,6 @@ class FPSControls {
     connect() {
         document.addEventListener('pointerlockchange', () => {
             this.isLocked = document.pointerLockElement === this.domElement;
-            // НЕ выбрасываем в меню при потере pointer lock
-            // Выход в меню ТОЛЬКО через ESC или перезагрузку страницы
         });
         
         document.addEventListener('mousemove', (e) => {
@@ -1860,6 +1871,29 @@ const colliders = [];
 const obstacles = [];
 let floor = null;
 const sandboxObjects = [];
+
+function requestGamePointerLock() {
+    if (isMobile) return;
+    if (mapEditor.active || mapEditor.testMode || isSandboxPanelOpen()) return;
+    const target = renderer?.domElement || document.getElementById('game-container');
+    target?.requestPointerLock?.();
+}
+
+function isSandboxPanelOpen() {
+    const panel = document.getElementById('sandbox-tools');
+    return panel && panel.style.display !== 'none';
+}
+
+function setSandboxPanelVisible(show) {
+    const panel = document.getElementById('sandbox-tools');
+    if (panel) panel.style.display = show ? 'block' : 'none';
+    if (show && !isMobile) {
+        document.exitPointerLock?.();
+    } else if (!show && !isMobile && state.isPlaying && !mapEditor.active) {
+        const target = renderer?.domElement || document.getElementById('game-container');
+        target?.requestPointerLock?.();
+    }
+}
 
 function clearMap() {
     mapGroup.visible = true;
@@ -2105,6 +2139,7 @@ function addSandboxObject(data, emitToServer = false) {
     const color = data.color || '#e94560';
     const pos = data.position || { x: 0, y: size.h / 2, z: 0 };
     const rot = data.rotation || { x: 0, y: 0, z: 0 };
+    const id = data.id || (`sbx-${Date.now()}-${Math.random().toString(16).slice(2)}`);
     
     const geo = createEditorGeometry(shape, size);
     const mat = new THREE.MeshStandardMaterial({ color });
@@ -2116,10 +2151,10 @@ function addSandboxObject(data, emitToServer = false) {
     scene.add(mesh);
     obstacles.push(mesh);
     colliders.push({ mesh, box: new THREE.Box3().setFromObject(mesh) });
-    sandboxObjects.push({ mesh });
+    sandboxObjects.push({ id, mesh });
     
     if (emitToServer && mpSocket && mpSocket.connected && state.mpMode === 'sandbox') {
-        mpSocket.emit('sandboxPlace', data);
+        mpSocket.emit('sandboxPlace', { ...data, id });
     }
 }
 
@@ -2149,11 +2184,67 @@ function sandboxPlaceBlock() {
     addSandboxObject(data, true);
 }
 
+function toggleHammer(forceState = null) {
+    if (!state.sandbox.active) return;
+    const shouldEnable = forceState !== null ? forceState : state.currentWeapon !== 'hammer';
+    
+    if (shouldEnable) {
+        if (state.currentWeapon !== 'hammer') {
+            state.savedWeaponBeforeHammer = state.currentWeapon;
+        }
+        switchWeapon('hammer');
+        // Панель открываем только по U (ниже), курсор не освобождаем
+        setSandboxPanelVisible(false);
+    } else {
+        setSandboxPanelVisible(false);
+        const back = state.savedWeaponBeforeHammer || 'rifle';
+        state.savedWeaponBeforeHammer = null;
+        switchWeapon(back);
+        if (!isMobile && state.isPlaying && !mapEditor.active) {
+            document.getElementById('game-container')?.requestPointerLock();
+        }
+    }
+}
+
+function removeSandboxObject(id, emit = false) {
+    const idx = sandboxObjects.findIndex(o => o.id === id);
+    if (idx === -1) return;
+    const obj = sandboxObjects[idx];
+    if (obj.mesh) {
+        scene.remove(obj.mesh);
+        const obsIdx = obstacles.indexOf(obj.mesh);
+        if (obsIdx !== -1) obstacles.splice(obsIdx, 1);
+        const colIdx = colliders.findIndex(c => c.mesh === obj.mesh);
+        if (colIdx !== -1) colliders.splice(colIdx, 1);
+        if (obj.mesh.geometry) obj.mesh.geometry.dispose();
+        if (obj.mesh.material) obj.mesh.material.dispose();
+    }
+    sandboxObjects.splice(idx, 1);
+    if (emit && mpSocket && mpSocket.connected && state.mpMode === 'sandbox') {
+        mpSocket.emit('sandboxRemove', { id });
+    }
+}
+
+function removeSandboxAtRay() {
+    if (!state.sandbox.active || sandboxObjects.length === 0) return;
+    const meshes = sandboxObjects.map(o => o.mesh);
+    const ray = new THREE.Raycaster(camera.position, camera.getWorldDirection(new THREE.Vector3()).normalize(), 0, 200);
+    const hits = ray.intersectObjects(meshes);
+    if (hits.length > 0) {
+        const hitMesh = hits[0].object;
+        const found = sandboxObjects.find(o => o.mesh === hitMesh);
+        if (found && found.id) {
+            removeSandboxObject(found.id, true);
+        }
+    }
+}
+
 // ==================== WEAPON MODEL ====================
 const weaponGroup = new THREE.Group();
 const sniperGroup = new THREE.Group();
 const knifeGroup = new THREE.Group();
 const rocketLauncherGroup = new THREE.Group();
+const hammerGroup = new THREE.Group();
 const weaponPivot = new THREE.Group();
 
 function createWeapon() {
@@ -2360,6 +2451,22 @@ function createWeapon() {
     rocketLauncherGroup.rotation.x = -0.1;
     rocketLauncherGroup.visible = false;
     weaponPivot.add(rocketLauncherGroup);
+
+    // Hammer (simple model)
+    const hammerHandleGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.6, 8);
+    const hammerHandleMat = new THREE.MeshPhongMaterial({ color: 0x8b5a2b });
+    const hammerHandle = new THREE.Mesh(hammerHandleGeo, hammerHandleMat);
+    hammerHandle.position.set(0, -0.2, 0);
+    hammerGroup.add(hammerHandle);
+    const hammerHeadGeo = new THREE.BoxGeometry(0.16, 0.12, 0.24);
+    const hammerHeadMat = new THREE.MeshPhongMaterial({ color: 0x555555 });
+    const hammerHead = new THREE.Mesh(hammerHeadGeo, hammerHeadMat);
+    hammerHead.position.set(0, 0.1, -0.05);
+    hammerGroup.add(hammerHead);
+    hammerGroup.position.set(0.25, -0.1, -0.4);
+    hammerGroup.rotation.x = -0.3;
+    hammerGroup.visible = false;
+    weaponPivot.add(hammerGroup);
     
     camera.add(weaponPivot);
 }
@@ -2367,6 +2474,7 @@ function createWeapon() {
 function switchWeapon(weapon) {
     if (state.isReloading) return;
     if (state.currentWeapon === weapon) return;
+    if (weapon === 'hammer' && !state.sandbox.active) return;
     // In party mode, only allow switching to rocketLauncher
     if (state.partyMode && weapon !== 'rocketLauncher') return;
     
@@ -2384,6 +2492,10 @@ function switchWeapon(weapon) {
     sniperGroup.visible = false;
     knifeGroup.visible = false;
     rocketLauncherGroup.visible = false;
+    hammerGroup.visible = false;
+    if (weapon !== 'hammer') {
+        setSandboxPanelVisible(false);
+    }
     
     if (weapon === 'rifle') {
         weaponGroup.visible = true;
@@ -2404,6 +2516,14 @@ function switchWeapon(weapon) {
     } else if (weapon === 'rocketLauncher') {
         rocketLauncherGroup.visible = true;
         document.getElementById('weapon-name').textContent = '🎆 Ракетница';
+        document.getElementById('ammo').style.display = 'none';
+    } else if (weapon === 'hammer') {
+        hammerGroup.visible = true;
+        document.getElementById('weapon-name').textContent = 'Молоток';
+        document.getElementById('ammo').style.display = 'none';
+        const panel = document.getElementById('sandbox-tools');
+        if (panel) panel.style.display = 'block';
+    } else {
         document.getElementById('ammo').style.display = 'none';
     }
 }
@@ -4565,6 +4685,7 @@ function updatePartyEffects(delta) {
 
 function shoot() {
     if (!state.isPlaying) return;
+    if (state.currentWeapon === 'hammer') return; // hammer does not shoot
     
     // Handle party mode - shoot fireworks
     if (state.partyMode && state.currentWeapon === 'rocketLauncher') {
@@ -5349,6 +5470,27 @@ document.addEventListener('keydown', (e) => {
         case 'Digit1': switchWeapon('rifle'); break;
         case 'Digit2': switchWeapon('sniper'); break;
         case 'Digit3': switchWeapon('knife'); break;
+        case 'Digit4':
+            if (state.sandbox.active) toggleHammer();
+            break;
+        case 'KeyU':
+            if (state.sandbox.active) {
+                const willOpen = !isSandboxPanelOpen();
+            if (willOpen) {
+                document.exitPointerLock?.();
+                setSandboxPanelVisible(true);
+            } else {
+                setSandboxPanelVisible(false);
+                if (!isMobile) {
+                    const target = renderer?.domElement || document.getElementById('game-container');
+                    target?.requestPointerLock?.();
+                }
+            }
+            }
+            break;
+        case 'Escape':
+            // Let ESC be handled globally; no early return
+            break;
     }
 });
 
@@ -5376,6 +5518,16 @@ document.addEventListener('keyup', (e) => {
 let isMouseDown = false;
 document.addEventListener('mousedown', (e) => {
     if (!state.isPlaying) return;
+    
+    if (state.currentWeapon === 'hammer' && state.sandbox.active) {
+        // Hammer controls: LMB remove, RMB place
+        if (e.button === 0) {
+            removeSandboxAtRay();
+        } else if (e.button === 2) {
+            sandboxPlaceBlock();
+        }
+        return;
+    }
     
     // Re-lock pointer if lost (after alt-tab etc)
     if (!controls.isLocked && !isMobile) {
@@ -5454,6 +5606,7 @@ document.getElementById('play-btn').addEventListener('click', () => {
     document.getElementById('hud').style.display = 'block';
     document.getElementById('crosshair').style.display = 'block';
     if (isMobile) document.getElementById('exit-btn').style.display = 'block';
+    requestGamePointerLock();
 });
 
 function joinCurrentMpMode() {
@@ -5513,8 +5666,8 @@ function startMultiplayer() {
     ensureMatchmaking();
     updateMpScore();
     if (isMobile) document.getElementById('exit-btn').style.display = 'block';
-    const panel = document.getElementById('sandbox-tools');
-    if (panel) panel.style.display = 'none';
+    setSandboxPanelVisible(false);
+    requestGamePointerLock();
 }
 
 function startTeamMode() {
@@ -5541,8 +5694,8 @@ function startTeamMode() {
     ensureMatchmaking();
     updateMpScore();
     if (isMobile) document.getElementById('exit-btn').style.display = 'block';
-    const panel = document.getElementById('sandbox-tools');
-    if (panel) panel.style.display = 'none';
+    setSandboxPanelVisible(false);
+    requestGamePointerLock();
 }
 
 function startFfaMode() {
@@ -5569,8 +5722,8 @@ function startFfaMode() {
     ensureMatchmaking();
     updateMpScore();
     if (isMobile) document.getElementById('exit-btn').style.display = 'block';
-    const panel = document.getElementById('sandbox-tools');
-    if (panel) panel.style.display = 'none';
+    setSandboxPanelVisible(false);
+    requestGamePointerLock();
 }
 
 function startSandboxMode() {
@@ -5596,9 +5749,9 @@ function startSandboxMode() {
     enterGameUI();
     ensureMatchmaking();
     document.getElementById('mp-score').style.display = 'none';
-    const panel = document.getElementById('sandbox-tools');
-    if (panel) panel.style.display = 'block';
+    setSandboxPanelVisible(true);
     if (isMobile) document.getElementById('exit-btn').style.display = 'block';
+    requestGamePointerLock();
 }
 
 function leaveMultiplayer() {
@@ -5633,8 +5786,10 @@ function leaveMultiplayer() {
     document.getElementById('mp-score').style.display = 'none';
     document.getElementById('exit-btn').style.display = 'none';
     clearSandboxObjectsLocal();
-    const panel = document.getElementById('sandbox-tools');
-    if (panel) panel.style.display = 'none';
+    setSandboxPanelVisible(false);
+    if (state.currentWeapon === 'hammer') {
+        switchWeapon('rifle');
+    }
 }
 
 // Multiplayer menu button
@@ -5677,6 +5832,7 @@ const sandboxSizeVal = document.getElementById('sandbox-size-val');
 const sandboxColorInput = document.getElementById('sandbox-color');
 const sandboxPlaceBtn = document.getElementById('sandbox-place');
 const sandboxClearLocalBtn = document.getElementById('sandbox-clear-local');
+const mobileHammerBtn = document.getElementById('btn-hammer');
 
 function updateSandboxSizeLabel() {
     if (sandboxSizeVal && sandboxSizeInput) {
@@ -5712,6 +5868,14 @@ if (sandboxPlaceBtn) {
 
 if (sandboxClearLocalBtn) {
     sandboxClearLocalBtn.addEventListener('click', clearSandboxObjectsLocal);
+}
+
+if (mobileHammerBtn) {
+    mobileHammerBtn.addEventListener('click', () => {
+        if (state.sandbox.active) {
+            toggleHammer();
+        }
+    });
 }
 
 // ==================== MAP EDITOR ====================
@@ -6568,12 +6732,8 @@ if (typeof state.cheats.speedMultiplier !== 'number' || isNaN(state.cheats.speed
 }
 normalizeCheatsEnabled();
 applyCheatUIFromState();
-if (state.adminUnlocked && adminPanel) {
-    adminPanel.classList.add('active');
-    if (adminToggle) adminToggle.checked = true;
-}
-if (state.adminUnlocked) {
-    adminPanel.classList.add('active');
+if (state.adminUnlocked && adminToggle) {
+    adminToggle.checked = true;
 }
 
 // Settings load
@@ -6689,6 +6849,7 @@ function toggleAdminPanel() {
 // J key listener for admin panel (works when unlocked via secret code)
 document.addEventListener('keydown', (e) => {
     if (e.code === 'KeyJ') {
+        if (!state.adminUnlocked) return;
         // Don't toggle if typing in textarea
         const textareas = adminTextareas();
         for (const ta of textareas) {
@@ -6704,6 +6865,12 @@ document.addEventListener('keydown', (e) => {
             closeAdminPanel();
             return;
         }
+
+        // Close hammer panel in sandbox
+        if (state.sandbox.active && isSandboxPanelOpen()) {
+            toggleHammer(false);
+            return;
+        }
         
         // Exit test mode back to editor
         if (mapEditor.testMode) {
@@ -6711,7 +6878,7 @@ document.addEventListener('keydown', (e) => {
             exitTestMode();
             return;
         }
-        
+
         // Otherwise exit to menu if playing
         if (state.isPlaying) {
             e.preventDefault();
@@ -6858,6 +7025,13 @@ if (adminSandboxClear) {
     });
 }
 
+const adminMobileBtn = document.getElementById('admin-mobile-btn');
+function updateAdminMobileButton() {
+    if (!adminMobileBtn) return;
+    adminMobileBtn.style.display = (isMobile && state.adminUnlocked) ? 'block' : 'none';
+}
+updateAdminMobileButton();
+
 if (adminToggle) {
     adminToggle.addEventListener('change', () => {
         if (adminToggle.checked) {
@@ -6865,8 +7039,10 @@ if (adminToggle) {
             adminPanel.classList.add('active');
         } else {
             adminPanel.classList.remove('active');
+            state.adminUnlocked = false;
         }
         saveCheatsState();
+        updateAdminMobileButton();
     });
 }
 
@@ -6882,6 +7058,13 @@ function showAdminBanner(msg) {
 if (adminBanner) {
     adminBanner.addEventListener('click', () => {
         adminBanner.style.display = 'none';
+    });
+}
+
+if (adminMobileBtn) {
+    adminMobileBtn.addEventListener('click', () => {
+        if (!state.adminUnlocked) return;
+        toggleAdminPanel();
     });
 }
 
@@ -7837,6 +8020,11 @@ function connectMultiplayer() {
         if (state.mpMode !== 'sandbox') return;
         clearSandboxObjectsLocal();
     });
+
+mpSocket.on('sandboxRemove', ({ id }) => {
+    if (state.mpMode !== 'sandbox') return;
+    removeSandboxObject(id, false);
+});
 
     mpSocket.on('state', handleRemoteState);
     mpSocket.on('shoot', handleRemoteShoot);
