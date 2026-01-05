@@ -38,7 +38,325 @@
         .primary-btn:hover {
             transform: translateY(-3px); box-shadow: 0 15px 40px rgba(233, 69, 96, 0.6);
         }
-        #mp-btn { margin-top: 18px; }
+        #mp-menu-btn { margin-top: 18px; }
+        
+        /* Multiplayer Menu */
+        #mp-menu {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 100%);
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 1001;
+            gap: 15px;
+        }
+        #mp-menu h1 {
+            font-size: 48px; color: #00d4ff; text-transform: uppercase;
+            letter-spacing: 6px; margin-bottom: 10px;
+            text-shadow: 0 0 30px rgba(0, 212, 255, 0.5);
+        }
+        #mp-menu p { color: #888; margin-bottom: 30px; font-size: 16px; }
+        .mp-mode-btn {
+            width: 320px;
+            padding: 20px 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            background: linear-gradient(135deg, #1e3a5f, #2d5a87);
+            border: 2px solid #00d4ff;
+            transition: all 0.3s ease;
+        }
+        .mp-mode-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, #2d5a87, #3d7ab7);
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.4);
+        }
+        .mp-mode-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            border-color: #444;
+        }
+        .mp-mode-btn .mode-icon { font-size: 32px; }
+        .mp-mode-btn .mode-name { font-size: 18px; font-weight: bold; }
+        .mp-mode-btn .mode-desc { font-size: 12px; color: #aaa; text-transform: none; letter-spacing: 0; }
+        .secondary-btn {
+            padding: 12px 30px; font-size: 16px;
+            background: transparent;
+            color: #888; border: 1px solid #444;
+            border-radius: 8px; cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+        }
+        .secondary-btn:hover {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border-color: #666;
+        }
+        #mp-status {
+            margin-top: 20px;
+            padding: 10px 20px;
+            color: #00d4ff;
+            font-size: 14px;
+            min-height: 20px;
+        }
+        #map-editor-btn {
+            margin-top: 10px;
+        }
+        
+        /* Map Editor */
+        #map-editor {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 10, 21, 0.25);
+            display: none;
+            z-index: 1002;
+        }
+        /* Sandbox tools */
+        #sandbox-tools {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 260px;
+            padding: 14px;
+            background: rgba(12, 12, 20, 0.9);
+            border: 1px solid #333;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+            display: none;
+            z-index: 1200;
+            color: #fff;
+        }
+        #sandbox-tools h4 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            color: #f97316;
+        }
+        .sandbox-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+        .sandbox-shape-btn {
+            flex: 1 1 48%;
+            padding: 8px;
+            border: 1px solid #444;
+            background: rgba(255,255,255,0.04);
+            color: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .sandbox-shape-btn.active {
+            border-color: #f97316;
+            background: rgba(249, 115, 22, 0.25);
+            box-shadow: 0 0 12px rgba(249,115,22,0.3);
+        }
+        #sandbox-size {
+            flex: 1;
+        }
+        #sandbox-color {
+            width: 60px;
+            height: 32px;
+            border: none;
+            border-radius: 6px;
+            padding: 0;
+            background: transparent;
+        }
+        .sandbox-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .sandbox-actions button {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #444;
+            background: linear-gradient(135deg, #2d2d40, #1a1a2e);
+            color: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .sandbox-actions button:hover {
+            border-color: #f97316;
+            box-shadow: 0 0 12px rgba(249,115,22,0.25);
+        }
+        #editor-toolbar {
+            position: fixed;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(20, 20, 40, 0.95);
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1003;
+        }
+        #editor-toolbar h3 {
+            color: #fff;
+            font-size: 14px;
+            margin: 0 0 10px 0;
+            text-align: center;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+        }
+        .editor-shape-btn {
+            width: 60px;
+            height: 60px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid #444;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 28px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .editor-shape-btn:hover {
+            background: rgba(255,255,255,0.2);
+            border-color: #6b5b95;
+        }
+        .editor-shape-btn.active {
+            background: rgba(107, 91, 149, 0.5);
+            border-color: #8b7bb5;
+            box-shadow: 0 0 15px rgba(107, 91, 149, 0.5);
+        }
+        .editor-shape-btn span {
+            font-size: 10px;
+            display: block;
+        }
+        #editor-colors {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            max-width: 140px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #444;
+        }
+        .editor-color-btn {
+            width: 28px;
+            height: 28px;
+            border: 2px solid #333;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .editor-color-btn:hover {
+            transform: scale(1.1);
+        }
+        .editor-color-btn.active {
+            border-color: #fff;
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+        #editor-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(20, 20, 40, 0.95);
+            border: 1px solid #333;
+            border-radius: 10px;
+            padding: 15px 25px;
+            display: flex;
+            gap: 15px;
+            z-index: 1003;
+        }
+        .editor-ctrl-btn {
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid #444;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .editor-ctrl-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        .editor-ctrl-btn.danger {
+            border-color: #e94560;
+            color: #e94560;
+        }
+        .editor-ctrl-btn.danger:hover {
+            background: rgba(233, 69, 96, 0.2);
+        }
+        #editor-info {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(20, 20, 40, 0.95);
+            border: 1px solid #333;
+            border-radius: 10px;
+            padding: 12px 25px;
+            color: #888;
+            font-size: 13px;
+            z-index: 1003;
+        }
+        #editor-info kbd {
+            background: rgba(255,255,255,0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin: 0 3px;
+        }
+        #editor-preview {
+            position: fixed;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(20, 20, 40, 0.95);
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 15px;
+            z-index: 1003;
+            min-width: 150px;
+        }
+        #editor-preview h4 {
+            color: #fff;
+            font-size: 12px;
+            margin: 0 0 10px 0;
+            text-align: center;
+        }
+        #editor-preview-canvas {
+            width: 120px;
+            height: 120px;
+            background: #000;
+            border-radius: 8px;
+        }
+        #editor-size-controls {
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .editor-size-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .editor-size-row label {
+            color: #888;
+            font-size: 11px;
+            width: 20px;
+        }
+        .editor-size-row input {
+            flex: 1;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #fff;
+            padding: 4px 8px;
+            font-size: 12px;
+            width: 60px;
+        }
         #secret-wrapper {
             margin-top: 24px;
             display: flex;
@@ -279,6 +597,21 @@
         }
         #admin-panel .btn-party.active {
             box-shadow: 0 0 25px rgba(236,72,153,0.8), inset 0 0 20px rgba(255,255,255,0.2);
+        }
+        #admin-panel .btn-sandbox-clear {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #f97316;
+            background: linear-gradient(135deg, #fb923c, #f97316);
+            color: #000;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        #admin-panel .btn-sandbox-clear:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(249, 115, 22, 0.35);
         }
         @keyframes partyGradient {
             0% { background-position: 0% 50%; }
@@ -845,6 +1178,7 @@
                 <button id="admin-send-global" class="btn-global">📢 Отправить глобально</button>
                 <div class="admin-divider"></div>
                 <button id="admin-party-global" class="btn-party">🎆 Праздник</button>
+                <button id="admin-sandbox-clear" class="btn-sandbox-clear">🧹 Очистить песочницу</button>
             </div>
             
             <!-- Local Tab -->
@@ -871,7 +1205,8 @@
         <h1>Standoff Online</h1>
         <p>Браузерный шутер</p>
         <button id="play-btn" class="primary-btn">Играть</button>
-        <button id="mp-btn" class="primary-btn">Играть мультиплеер</button>
+        <button id="mp-menu-btn" class="primary-btn">Мультиплеер</button>
+        <button id="map-editor-btn" class="primary-btn">Редактор карт</button>
         <button id="edit-controls-btn">Настроить управление</button>
         <button id="edit-hud-btn">Настроить HUD</button>
         <button id="edit-crosshair-btn">Настроить прицел</button>
@@ -945,6 +1280,96 @@
         <div id="controls-info">
             <p>WASD - Движение | ПРОБЕЛ - Прыжок | ЛКМ - Стрельба | ПКМ - Прицел | R - Перезарядка | G - Граната</p>
             <p>1/2 - Смена оружия | B - Установить бомбу</p>
+        </div>
+    </div>
+    
+    <!-- Multiplayer Menu -->
+    <div id="mp-menu">
+        <h1>Мультиплеер</h1>
+        <p>Выберите режим игры</p>
+        <button id="mp-duel-btn" class="primary-btn mp-mode-btn">
+            <span class="mode-icon">⚔️</span>
+            <span class="mode-name">Дуэли 1v1</span>
+            <span class="mode-desc">Сражение один на один</span>
+        </button>
+        <button id="mp-team-btn" class="primary-btn mp-mode-btn">
+            <span class="mode-icon">👥</span>
+            <span class="mode-name">Команды 5v5</span>
+            <span class="mode-desc">Командный бой</span>
+        </button>
+        <button id="mp-ffa-btn" class="primary-btn mp-mode-btn">
+            <span class="mode-icon">🎯</span>
+            <span class="mode-name">Все против всех</span>
+            <span class="mode-desc">Каждый сам за себя</span>
+        </button>
+        <button id="mp-sandbox-btn" class="primary-btn mp-mode-btn">
+            <span class="mode-icon">🛠️</span>
+            <span class="mode-name">Песочница</span>
+            <span class="mode-desc">Один сервер для всех</span>
+        </button>
+        <button id="mp-back-btn" class="secondary-btn">← Назад</button>
+        <div id="mp-status"></div>
+    </div>
+    
+    <!-- Map Editor -->
+    <div id="map-editor">
+        <div id="editor-toolbar">
+            <h3>Фигуры</h3>
+            <button class="editor-shape-btn active" data-shape="box" title="Куб">📦</button>
+            <button class="editor-shape-btn" data-shape="sphere" title="Сфера">🔮</button>
+            <button class="editor-shape-btn" data-shape="cylinder" title="Цилиндр">🥫</button>
+            <button class="editor-shape-btn" data-shape="cone" title="Конус">🔺</button>
+            <button class="editor-shape-btn" data-shape="plane" title="Плоскость">📄</button>
+            <button class="editor-shape-btn" data-shape="ramp" title="Рампа">📐</button>
+            <div id="editor-colors">
+                <button class="editor-color-btn active" data-color="#e94560" style="background:#e94560"></button>
+                <button class="editor-color-btn" data-color="#00d4ff" style="background:#00d4ff"></button>
+                <button class="editor-color-btn" data-color="#4ecdc4" style="background:#4ecdc4"></button>
+                <button class="editor-color-btn" data-color="#ffe66d" style="background:#ffe66d"></button>
+                <button class="editor-color-btn" data-color="#ff6b6b" style="background:#ff6b6b"></button>
+                <button class="editor-color-btn" data-color="#c44dff" style="background:#c44dff"></button>
+                <button class="editor-color-btn" data-color="#95e1d3" style="background:#95e1d3"></button>
+                <button class="editor-color-btn" data-color="#f38181" style="background:#f38181"></button>
+                <button class="editor-color-btn" data-color="#aa96da" style="background:#aa96da"></button>
+                <button class="editor-color-btn" data-color="#fcbad3" style="background:#fcbad3"></button>
+                <button class="editor-color-btn" data-color="#ffffff" style="background:#ffffff"></button>
+                <button class="editor-color-btn" data-color="#888888" style="background:#888888"></button>
+                <button class="editor-color-btn" data-color="#333333" style="background:#333333"></button>
+                <button class="editor-color-btn" data-color="#1a1a2e" style="background:#1a1a2e"></button>
+                <button class="editor-color-btn" data-color="#2d3436" style="background:#2d3436"></button>
+                <button class="editor-color-btn" data-color="#6c5ce7" style="background:#6c5ce7"></button>
+            </div>
+        </div>
+        
+        <div id="editor-info">
+            <kbd>ЛКМ</kbd> Поставить · <kbd>ПКМ</kbd> Удалить · <kbd>WASD</kbd> Движение · <kbd>Scroll</kbd> Размер · <kbd>R</kbd> Вращение · <kbd>ESC</kbd> Выход
+        </div>
+        
+        <div id="editor-preview">
+            <h4>Превью объекта</h4>
+            <canvas id="editor-preview-canvas"></canvas>
+            <div id="editor-size-controls">
+                <div class="editor-size-row">
+                    <label>W</label>
+                    <input type="number" id="editor-size-w" value="2" min="0.5" max="50" step="0.5">
+                </div>
+                <div class="editor-size-row">
+                    <label>H</label>
+                    <input type="number" id="editor-size-h" value="2" min="0.5" max="50" step="0.5">
+                </div>
+                <div class="editor-size-row">
+                    <label>D</label>
+                    <input type="number" id="editor-size-d" value="2" min="0.5" max="50" step="0.5">
+                </div>
+            </div>
+        </div>
+        
+        <div id="editor-controls">
+            <button class="editor-ctrl-btn" id="editor-clear">🗑️ Очистить</button>
+            <button class="editor-ctrl-btn" id="editor-save">💾 Сохранить</button>
+            <button class="editor-ctrl-btn" id="editor-load">📂 Загрузить</button>
+            <button class="editor-ctrl-btn" id="editor-test">▶️ Тест</button>
+            <button class="editor-ctrl-btn danger" id="editor-exit">✕ Выход</button>
         </div>
     </div>
     
@@ -1051,6 +1476,30 @@
         <div id="weapon-name">AK-47</div>
         <div id="grenades-count" data-ctrl="hudGrenades">🧨 <span id="grenade-num">3</span></div>
         <div id="kills" data-ctrl="hudKills">Убийства: <span id="kill-count">0</span></div>
+    </div>
+
+    <!-- Sandbox tools -->
+    <div id="sandbox-tools">
+        <h4>Песочница</h4>
+        <div class="sandbox-row">
+            <button class="sandbox-shape-btn active" data-shape="box">Куб</button>
+            <button class="sandbox-shape-btn" data-shape="plane">Плоскость</button>
+            <button class="sandbox-shape-btn" data-shape="ramp">Рампа</button>
+            <button class="sandbox-shape-btn" data-shape="cylinder">Цилиндр</button>
+        </div>
+        <div class="sandbox-row">
+            <label>Размер</label>
+            <input id="sandbox-size" type="range" min="0.5" max="8" step="0.5" value="2">
+            <span id="sandbox-size-val">2.0</span>
+        </div>
+        <div class="sandbox-row">
+            <label>Цвет</label>
+            <input id="sandbox-color" type="color" value="#e94560">
+        </div>
+        <div class="sandbox-actions">
+            <button id="sandbox-place">Поставить блок</button>
+            <button id="sandbox-clear-local">Очистить у себя</button>
+        </div>
     </div>
     
     <!-- Crosshair -->
@@ -1185,6 +1634,7 @@ const state = {
     mpSpawnIndex: 0,
     mpOpponentId: null,
     mpRoom: null,
+    mpTeam: null,
     health: CONFIG.player.health,
     currentWeapon: 'rifle', // rifle, sniper or knife
     ammo: CONFIG.weapon.magazineSize,
@@ -1242,6 +1692,13 @@ const state = {
     knifeCooldown: false,
     partyMode: false,
     partyFireworks: [],
+    partyEffects: {
+        discoBalls: [],
+        spotlights: [],
+        originalBackground: null,
+        originalFog: null,
+        originalAmbient: null
+    },
     savedWeaponBeforeParty: null,
     mpKills: 0,
     mpDeaths: 0,
@@ -1251,7 +1708,13 @@ const state = {
     bombTimer: 0,
     bombDefuseTimer: 0,
     enemyDefusing: false,
-    regenTimer: 0
+    regenTimer: 0,
+    mpMode: null, // duel | team | ffa | sandbox
+    sandbox: {
+        active: false,
+        objects: [],
+        tool: { shape: 'box', color: '#e94560', size: 2 }
+    }
 };
 
 // ==================== THREE.JS SETUP ====================
@@ -1394,8 +1857,12 @@ const materials = {
 const mapGroup = new THREE.Group();
 scene.add(mapGroup);
 const colliders = [];
+const obstacles = [];
+let floor = null;
+const sandboxObjects = [];
 
 function clearMap() {
+    mapGroup.visible = true;
     colliders.length = 0;
     while (mapGroup.children.length > 0) {
         const child = mapGroup.children.pop();
@@ -1424,6 +1891,7 @@ function createBox(w, h, d, x, y, z, material, isCollider = true) {
 }
 
 function createDefaultMap() {
+    mapGroup.visible = true;
     CONFIG.map.size = DEFAULT_MAP_SIZE;
     clearMap();
     const S = CONFIG.map.size;
@@ -1434,6 +1902,7 @@ function createDefaultMap() {
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     mapGroup.add(ground);
+    floor = ground;
 
     // Outer walls (sandstone perimeter)
     createBox(S * 2, 5.5, 1, 0, 2.75, -S, materials.stone);
@@ -1515,6 +1984,7 @@ function createDefaultMap() {
 }
 
 function createAimMap() {
+    mapGroup.visible = true;
     CONFIG.map.size = AIM_MAP_SIZE;
     clearMap();
     const S = CONFIG.map.size;
@@ -1524,6 +1994,7 @@ function createAimMap() {
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     mapGroup.add(ground);
+    floor = ground;
 
     // Perimeter walls to keep players inside
     createBox(S * 2, 3.5, 1, 0, 1.75, -S, materials.plaster);
@@ -1573,7 +2044,110 @@ function createAimMap() {
     stack(0, -10, 2, 2.0, 1.6, 2.0);
 }
 
+function createSandboxMap() {
+    mapGroup.visible = true;
+    CONFIG.map.size = 50;
+    clearMap();
+    const S = CONFIG.map.size;
+    // Ground as collider box
+    const ground = createBox(S * 2, 0.4, S * 2, 0, -0.2, 0, materials.sand, true);
+    floor = ground;
+    // Low walls to keep players inside
+    createBox(S * 2, 3, 1, 0, 1.5, -S, materials.stone);
+    createBox(S * 2, 3, 1, 0, 1.5, S, materials.stone);
+    createBox(1, 3, S * 2, -S, 1.5, 0, materials.stone);
+    createBox(1, 3, S * 2, S, 1.5, 0, materials.stone);
+}
+
+function getTeamSpawn(index = 0) {
+    const team = index < 5 ? 'blue' : 'red';
+    const offset = index % 5;
+    const base = team === 'blue' ? { x: -20, z: -20 } : { x: 20, z: 20 };
+    return new THREE.Vector3(base.x + offset * 2, CONFIG.player.height, base.z + offset * 2);
+}
+
+function getFfaSpawn(index = 0) {
+    const angle = (index % 16) / 16 * Math.PI * 2;
+    const radius = 22;
+    return new THREE.Vector3(
+        Math.cos(angle) * radius,
+        CONFIG.player.height,
+        Math.sin(angle) * radius
+    );
+}
+
+function getSandboxSpawn() {
+    return new THREE.Vector3(0, CONFIG.player.height, 0);
+}
+
 createDefaultMap();
+
+// ==================== SANDBOX HELPERS ====================
+function clearSandboxObjectsLocal() {
+    sandboxObjects.forEach(obj => {
+        if (obj.mesh) {
+            scene.remove(obj.mesh);
+            const obsIdx = obstacles.indexOf(obj.mesh);
+            if (obsIdx !== -1) obstacles.splice(obsIdx, 1);
+            const colIdx = colliders.findIndex(c => c.mesh === obj.mesh);
+            if (colIdx !== -1) colliders.splice(colIdx, 1);
+            if (obj.mesh.geometry) obj.mesh.geometry.dispose();
+            if (obj.mesh.material) obj.mesh.material.dispose();
+        }
+    });
+    sandboxObjects.length = 0;
+}
+
+function addSandboxObject(data, emitToServer = false) {
+    if (!data) return;
+    const shape = data.shape || 'box';
+    const size = data.size || { w: 2, h: 2, d: 2 };
+    const color = data.color || '#e94560';
+    const pos = data.position || { x: 0, y: size.h / 2, z: 0 };
+    const rot = data.rotation || { x: 0, y: 0, z: 0 };
+    
+    const geo = createEditorGeometry(shape, size);
+    const mat = new THREE.MeshStandardMaterial({ color });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(pos.x, pos.y, pos.z);
+    mesh.rotation.set(rot.x || 0, rot.y || 0, rot.z || 0);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+    obstacles.push(mesh);
+    colliders.push({ mesh, box: new THREE.Box3().setFromObject(mesh) });
+    sandboxObjects.push({ mesh });
+    
+    if (emitToServer && mpSocket && mpSocket.connected && state.mpMode === 'sandbox') {
+        mpSocket.emit('sandboxPlace', data);
+    }
+}
+
+function sandboxPlaceBlock() {
+    if (!state.sandbox.active) return;
+    const size = state.sandbox.tool.size || 2;
+    const shape = state.sandbox.tool.shape || 'box';
+    const color = state.sandbox.tool.color || '#e94560';
+    
+    const forward = new THREE.Vector3();
+    camera.getWorldDirection(forward);
+    forward.y = 0;
+    forward.normalize();
+    
+    const targetPos = camera.position.clone().add(forward.multiplyScalar(4));
+    const groundY = getGroundHeight(targetPos.x, targetPos.z);
+    targetPos.y = groundY + size / 2;
+    
+    const data = {
+        shape,
+        color,
+        size: { w: size, h: size, d: size },
+        position: { x: targetPos.x, y: targetPos.y, z: targetPos.z },
+        rotation: { x: 0, y: camera.rotation.y, z: 0 }
+    };
+    
+    addSandboxObject(data, true);
+}
 
 // ==================== WEAPON MODEL ====================
 const weaponGroup = new THREE.Group();
@@ -3800,6 +4374,9 @@ function togglePartyMode(activatorName = 'Админ') {
         if (partyBtnGlobal) partyBtnGlobal.textContent = '🎆 Праздник (ВКЛ)';
         if (partyBtnLocal) partyBtnLocal.textContent = '🎆 Праздник (ВКЛ)';
         
+        // Enable party effects
+        enablePartyEffects();
+        
     } else {
         // Restore previous weapon
         if (state.savedWeaponBeforeParty) {
@@ -3814,12 +4391,176 @@ function togglePartyMode(activatorName = 'Админ') {
         if (partyBtnGlobal) partyBtnGlobal.textContent = '🎆 Праздник';
         if (partyBtnLocal) partyBtnLocal.textContent = '🎆 Праздник';
         
+        // Disable party effects
+        disablePartyEffects();
+        
         // Clear remaining fireworks
         for (const fw of state.partyFireworks) {
             if (fw.mesh) scene.remove(fw.mesh);
         }
         state.partyFireworks = [];
     }
+}
+
+// Party disco effects
+function enablePartyEffects() {
+    const pe = state.partyEffects;
+    
+    // Save original scene settings
+    pe.originalBackground = scene.background.clone();
+    pe.originalFog = scene.fog ? { color: scene.fog.color.clone(), near: scene.fog.near, far: scene.fog.far } : null;
+    
+    // Dark night sky
+    scene.background = new THREE.Color(0x050510);
+    scene.fog = new THREE.Fog(0x050510, 5, 60);
+    
+    // Dim ambient light
+    scene.traverse((obj) => {
+        if (obj.isAmbientLight) {
+            pe.originalAmbient = obj.intensity;
+            obj.intensity = 0.1;
+        }
+    });
+    
+    // Create disco balls
+    const discoBallPositions = [
+        { x: 0, y: 15, z: 0 },
+        { x: -20, y: 12, z: -20 },
+        { x: 20, y: 12, z: 20 },
+        { x: -20, y: 12, z: 20 },
+        { x: 20, y: 12, z: -20 }
+    ];
+    
+    discoBallPositions.forEach((pos, i) => {
+        const discoBall = createDiscoBall(pos.x, pos.y, pos.z, i === 0 ? 2 : 1.2);
+        pe.discoBalls.push(discoBall);
+        scene.add(discoBall.group);
+    });
+    
+    // Create spotlights with different colors
+    const spotlightColors = [0xff0066, 0x00ff66, 0x0066ff, 0xffff00, 0xff00ff, 0x00ffff];
+    const spotlightPositions = [
+        { x: -15, z: -15 },
+        { x: 15, z: -15 },
+        { x: -15, z: 15 },
+        { x: 15, z: 15 },
+        { x: 0, z: -25 },
+        { x: 0, z: 25 }
+    ];
+    
+    spotlightPositions.forEach((pos, i) => {
+        const color = spotlightColors[i % spotlightColors.length];
+        const spotlight = new THREE.SpotLight(color, 3, 50, Math.PI / 6, 0.5, 1);
+        spotlight.position.set(pos.x, 20, pos.z);
+        spotlight.target.position.set(0, 0, 0);
+        scene.add(spotlight);
+        scene.add(spotlight.target);
+        pe.spotlights.push({ light: spotlight, baseAngle: i * Math.PI / 3, speed: 0.5 + Math.random() * 0.5 });
+    });
+}
+
+function createDiscoBall(x, y, z, size) {
+    const group = new THREE.Group();
+    
+    // Main sphere with mirror-like material
+    const geo = new THREE.SphereGeometry(size, 32, 32);
+    const mat = new THREE.MeshPhongMaterial({
+        color: 0xaaaaaa,
+        specular: 0xffffff,
+        shininess: 100,
+        emissive: 0x222222
+    });
+    const sphere = new THREE.Mesh(geo, mat);
+    group.add(sphere);
+    
+    // Add small mirror tiles
+    const tileGeo = new THREE.BoxGeometry(size * 0.15, size * 0.15, size * 0.02);
+    const tileMat = new THREE.MeshPhongMaterial({
+        color: 0xffffff,
+        specular: 0xffffff,
+        shininess: 150,
+        emissive: 0x333333
+    });
+    
+    for (let i = 0; i < 80; i++) {
+        const tile = new THREE.Mesh(tileGeo, tileMat);
+        const phi = Math.acos(-1 + (2 * i) / 80);
+        const theta = Math.sqrt(80 * Math.PI) * phi;
+        tile.position.setFromSphericalCoords(size * 1.02, phi, theta);
+        tile.lookAt(0, 0, 0);
+        group.add(tile);
+    }
+    
+    // Point light inside disco ball
+    const light = new THREE.PointLight(0xffffff, 2, 30);
+    group.add(light);
+    
+    group.position.set(x, y, z);
+    
+    return { group, sphere, light };
+}
+
+function disablePartyEffects() {
+    const pe = state.partyEffects;
+    
+    // Restore original scene settings
+    if (pe.originalBackground) {
+        scene.background = pe.originalBackground;
+    }
+    if (pe.originalFog) {
+        scene.fog = new THREE.Fog(pe.originalFog.color, pe.originalFog.near, pe.originalFog.far);
+    }
+    
+    // Restore ambient light
+    scene.traverse((obj) => {
+        if (obj.isAmbientLight && pe.originalAmbient !== null) {
+            obj.intensity = pe.originalAmbient;
+        }
+    });
+    
+    // Remove disco balls
+    pe.discoBalls.forEach(db => {
+        scene.remove(db.group);
+    });
+    pe.discoBalls = [];
+    
+    // Remove spotlights
+    pe.spotlights.forEach(sp => {
+        scene.remove(sp.light.target);
+        scene.remove(sp.light);
+    });
+    pe.spotlights = [];
+    
+    pe.originalBackground = null;
+    pe.originalFog = null;
+    pe.originalAmbient = null;
+}
+
+function updatePartyEffects(delta) {
+    if (!state.partyMode) return;
+    
+    const pe = state.partyEffects;
+    const time = performance.now() * 0.001;
+    
+    // Rotate disco balls
+    pe.discoBalls.forEach((db, i) => {
+        db.group.rotation.y += delta * (0.5 + i * 0.1);
+        // Pulse the light
+        db.light.intensity = 1.5 + Math.sin(time * 3 + i) * 0.5;
+    });
+    
+    // Animate spotlights
+    pe.spotlights.forEach((sp, i) => {
+        const angle = sp.baseAngle + time * sp.speed;
+        const radius = 15 + Math.sin(time * 0.5 + i) * 10;
+        sp.light.target.position.x = Math.cos(angle) * radius;
+        sp.light.target.position.z = Math.sin(angle) * radius;
+        sp.light.target.position.y = Math.sin(time * 2 + i) * 3;
+        
+        // Color shift
+        const hue = (time * 0.1 + i * 0.1) % 1;
+        sp.light.color.setHSL(hue, 1, 0.5);
+    });
 }
 
 function shoot() {
@@ -4477,7 +5218,14 @@ function respawnLocalPlayer() {
         mpRespawnTimeout = null;
     }
     resetPlayerStats();
-    const spawn = getAimSpawn(state.mpSpawnIndex || 0);
+    let spawn = getAimSpawn(state.mpSpawnIndex || 0);
+    if (state.mpMode === 'team') {
+        spawn = getTeamSpawn(state.mpSpawnIndex || 0);
+    } else if (state.mpMode === 'ffa') {
+        spawn = getFfaSpawn(state.mpSpawnIndex || 0);
+    } else if (state.mpMode === 'sandbox') {
+        spawn = getSandboxSpawn();
+    }
     placePlayer(spawn);
     if (mpSocket && mpSocket.connected) {
         mpSocket.emit('respawn', { x: spawn.x, y: spawn.y, z: spawn.z });
@@ -4520,6 +5268,7 @@ function resetGame(options = {}) {
     // Reset party mode
     if (state.partyMode) {
         state.partyMode = false;
+        disablePartyEffects();
         for (const fw of state.partyFireworks) {
             if (fw.mesh) scene.remove(fw.mesh);
         }
@@ -4697,8 +5446,6 @@ document.getElementById('play-btn').addEventListener('click', () => {
     document.getElementById('menu').querySelector('h1').textContent = 'Standoff Online';
     document.getElementById('menu').querySelector('p').textContent = 'Browser FPS Prototype';
     document.getElementById('play-btn').textContent = 'ИГРАТЬ';
-    const mpBtn = document.getElementById('mp-btn');
-    if (mpBtn) mpBtn.textContent = 'Играть мультиплеер 1v1';
     
     enterGameUI();
     // Fallback: если pointer lock не взялся, всё равно запускаем управление
@@ -4709,9 +5456,29 @@ document.getElementById('play-btn').addEventListener('click', () => {
     if (isMobile) document.getElementById('exit-btn').style.display = 'block';
 });
 
+function joinCurrentMpMode() {
+    if (!mpSocket || !mpSocket.connected || !state.isMultiplayer) return;
+    switch (state.mpMode) {
+        case 'team':
+            updateMpStatus('Команды: подключаемся...');
+            mpSocket.emit('joinTeam');
+            break;
+        case 'ffa':
+            updateMpStatus('FFA: подключаемся...');
+            mpSocket.emit('joinFFA');
+            break;
+        case 'sandbox':
+            updateMpStatus('Песочница: подключаемся...');
+            mpSocket.emit('joinSandbox');
+            break;
+        default:
+            joinMatchmaking();
+    }
+}
+
 function ensureMatchmaking() {
     if (mpSocket) {
-        if (mpSocket.connected) joinMatchmaking();
+        if (mpSocket.connected) joinCurrentMpMode();
         return; // если идёт connect, дождёмся штатного on('connect')
     }
     connectMultiplayer();
@@ -4725,6 +5492,9 @@ window.addEventListener('load', () => {
 function startMultiplayer() {
     state.isMultiplayer = true;
     state.isSearchingMatch = true;
+    state.mpMode = 'duel';
+    state.mpTeam = null;
+    state.sandbox.active = false;
     state.mpOpponentId = null;
     state.mpRoom = null;
     state.mpSpawnIndex = 0;
@@ -4732,25 +5502,116 @@ function startMultiplayer() {
         clearTimeout(mpRespawnTimeout);
         mpRespawnTimeout = null;
     }
+    clearSandboxObjectsLocal();
     createAimMap();
     resetRemotePlayers();
     resetGame({ skipEnemies: true, position: getAimSpawn(state.mpSpawnIndex || 0) });
     document.getElementById('menu').querySelector('h1').textContent = 'Standoff 1v1';
     document.getElementById('menu').querySelector('p').textContent = 'Aim карта для дуэлей';
-    const btn = document.getElementById('mp-btn');
-    if (btn) btn.textContent = 'Поиск соперника...';
+    updateMpStatus('Поиск соперника...');
     enterGameUI();
     ensureMatchmaking();
     updateMpScore();
+    if (isMobile) document.getElementById('exit-btn').style.display = 'block';
+    const panel = document.getElementById('sandbox-tools');
+    if (panel) panel.style.display = 'none';
+}
+
+function startTeamMode() {
+    state.isMultiplayer = true;
+    state.isSearchingMatch = true;
+    state.mpMode = 'team';
+    state.mpTeam = null;
+    state.sandbox.active = false;
+    state.mpOpponentId = null;
+    state.mpRoom = null;
+    state.mpSpawnIndex = 0;
+    if (mpRespawnTimeout) {
+        clearTimeout(mpRespawnTimeout);
+        mpRespawnTimeout = null;
+    }
+    clearSandboxObjectsLocal();
+    createDefaultMap();
+    resetRemotePlayers();
+    resetGame({ skipEnemies: true, position: getTeamSpawn(0) });
+    document.getElementById('menu').querySelector('h1').textContent = 'Команды 5v5';
+    document.getElementById('menu').querySelector('p').textContent = 'Командный бой';
+    updateMpStatus('Команды: поиск игроков...');
+    enterGameUI();
+    ensureMatchmaking();
+    updateMpScore();
+    if (isMobile) document.getElementById('exit-btn').style.display = 'block';
+    const panel = document.getElementById('sandbox-tools');
+    if (panel) panel.style.display = 'none';
+}
+
+function startFfaMode() {
+    state.isMultiplayer = true;
+    state.isSearchingMatch = true;
+    state.mpMode = 'ffa';
+    state.mpTeam = null;
+    state.sandbox.active = false;
+    state.mpOpponentId = null;
+    state.mpRoom = null;
+    state.mpSpawnIndex = 0;
+    if (mpRespawnTimeout) {
+        clearTimeout(mpRespawnTimeout);
+        mpRespawnTimeout = null;
+    }
+    clearSandboxObjectsLocal();
+    createDefaultMap();
+    resetRemotePlayers();
+    resetGame({ skipEnemies: true, position: getFfaSpawn(0) });
+    document.getElementById('menu').querySelector('h1').textContent = 'Все против всех';
+    document.getElementById('menu').querySelector('p').textContent = 'Каждый сам за себя';
+    updateMpStatus('FFA: подключаемся...');
+    enterGameUI();
+    ensureMatchmaking();
+    updateMpScore();
+    if (isMobile) document.getElementById('exit-btn').style.display = 'block';
+    const panel = document.getElementById('sandbox-tools');
+    if (panel) panel.style.display = 'none';
+}
+
+function startSandboxMode() {
+    state.isMultiplayer = true;
+    state.isSearchingMatch = false;
+    state.mpMode = 'sandbox';
+    state.mpTeam = null;
+    state.sandbox.active = true;
+    state.mpOpponentId = null;
+    state.mpRoom = null;
+    state.mpSpawnIndex = 0;
+    if (mpRespawnTimeout) {
+        clearTimeout(mpRespawnTimeout);
+        mpRespawnTimeout = null;
+    }
+    createSandboxMap();
+    resetRemotePlayers();
+    clearSandboxObjectsLocal();
+    resetGame({ skipEnemies: true, position: getSandboxSpawn() });
+    document.getElementById('menu').querySelector('h1').textContent = 'Песочница';
+    document.getElementById('menu').querySelector('p').textContent = 'Один общий сервер, стройте!';
+    updateMpStatus('Песочница: подключаемся...');
+    enterGameUI();
+    ensureMatchmaking();
+    document.getElementById('mp-score').style.display = 'none';
+    const panel = document.getElementById('sandbox-tools');
+    if (panel) panel.style.display = 'block';
     if (isMobile) document.getElementById('exit-btn').style.display = 'block';
 }
 
 function leaveMultiplayer() {
     state.isMultiplayer = false;
     state.isSearchingMatch = false;
+    state.mpMode = null;
     state.mpOpponentId = null;
     state.mpRoom = null;
     state.mpSpawnIndex = 0;
+    state.sandbox.active = false;
+    if (mpSocket && mpSocket.connected) {
+        mpSocket.emit('leaveMatch');
+    }
     if (mpRespawnTimeout) {
         clearTimeout(mpRespawnTimeout);
         mpRespawnTimeout = null;
@@ -4768,20 +5629,828 @@ function leaveMultiplayer() {
     document.getElementById('hud').style.display = 'none';
     document.getElementById('crosshair').style.display = 'none';
     document.getElementById('mobile-controls').classList.remove('active');
-    const btn = document.getElementById('mp-btn');
-    if (btn) btn.textContent = 'Играть мультиплеер 1v1';
+    updateMpStatus('');
     document.getElementById('mp-score').style.display = 'none';
     document.getElementById('exit-btn').style.display = 'none';
+    clearSandboxObjectsLocal();
+    const panel = document.getElementById('sandbox-tools');
+    if (panel) panel.style.display = 'none';
 }
 
-// Multiplayer button
-document.getElementById('mp-btn').addEventListener('click', () => {
-    if (state.isMultiplayer) {
-        leaveMultiplayer();
-    } else {
+// Multiplayer menu button
+document.getElementById('mp-menu-btn').addEventListener('click', () => {
+    document.getElementById('menu').style.display = 'none';
+    document.getElementById('mp-menu').style.display = 'flex';
+});
+
+// Back button in MP menu
+document.getElementById('mp-back-btn').addEventListener('click', () => {
+    document.getElementById('mp-menu').style.display = 'none';
+    document.getElementById('menu').style.display = 'flex';
+});
+
+// Duel mode button
+document.getElementById('mp-duel-btn').addEventListener('click', () => {
+    document.getElementById('mp-menu').style.display = 'none';
         startMultiplayer();
+});
+
+document.getElementById('mp-team-btn').addEventListener('click', () => {
+    document.getElementById('mp-menu').style.display = 'none';
+    startTeamMode();
+});
+
+document.getElementById('mp-ffa-btn').addEventListener('click', () => {
+    document.getElementById('mp-menu').style.display = 'none';
+    startFfaMode();
+});
+
+document.getElementById('mp-sandbox-btn').addEventListener('click', () => {
+    document.getElementById('mp-menu').style.display = 'none';
+    startSandboxMode();
+});
+
+// Sandbox UI
+const sandboxShapeBtns = document.querySelectorAll('.sandbox-shape-btn');
+const sandboxSizeInput = document.getElementById('sandbox-size');
+const sandboxSizeVal = document.getElementById('sandbox-size-val');
+const sandboxColorInput = document.getElementById('sandbox-color');
+const sandboxPlaceBtn = document.getElementById('sandbox-place');
+const sandboxClearLocalBtn = document.getElementById('sandbox-clear-local');
+
+function updateSandboxSizeLabel() {
+    if (sandboxSizeVal && sandboxSizeInput) {
+        sandboxSizeVal.textContent = (parseFloat(sandboxSizeInput.value) || 2).toFixed(1);
+    }
+}
+
+sandboxShapeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        sandboxShapeBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.sandbox.tool.shape = btn.dataset.shape || 'box';
+    });
+});
+
+if (sandboxSizeInput) {
+    sandboxSizeInput.addEventListener('input', () => {
+        state.sandbox.tool.size = parseFloat(sandboxSizeInput.value) || 2;
+        updateSandboxSizeLabel();
+    });
+    updateSandboxSizeLabel();
+}
+
+if (sandboxColorInput) {
+    sandboxColorInput.addEventListener('input', () => {
+        state.sandbox.tool.color = sandboxColorInput.value || '#e94560';
+    });
+}
+
+if (sandboxPlaceBtn) {
+    sandboxPlaceBtn.addEventListener('click', sandboxPlaceBlock);
+}
+
+if (sandboxClearLocalBtn) {
+    sandboxClearLocalBtn.addEventListener('click', clearSandboxObjectsLocal);
+}
+
+// ==================== MAP EDITOR ====================
+const mapEditor = {
+    active: false,
+    testMode: false,
+    savedColliders: null,
+    mapWasVisible: true,
+    selectedShape: 'box',
+    selectedColor: '#e94560',
+    objectSize: { w: 2, h: 2, d: 2 },
+    rotation: 0,
+    placedObjects: [],
+    ghostMesh: null,
+    previewRenderer: null,
+    previewScene: null,
+    previewCamera: null,
+    previewMesh: null,
+    editorFloor: null,
+    gridHelper: null,
+    hiddenObjects: [],
+    originalBackground: null,
+    originalFog: null
+};
+
+function initEditorPreview() {
+    const canvas = document.getElementById('editor-preview-canvas');
+    mapEditor.previewRenderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    mapEditor.previewRenderer.setSize(120, 120);
+    mapEditor.previewRenderer.setClearColor(0x000000);
+    
+    mapEditor.previewScene = new THREE.Scene();
+    mapEditor.previewCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+    mapEditor.previewCamera.position.set(3, 2, 3);
+    mapEditor.previewCamera.lookAt(0, 0, 0);
+    
+    const ambLight = new THREE.AmbientLight(0xffffff, 0.5);
+    mapEditor.previewScene.add(ambLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(5, 5, 5);
+    mapEditor.previewScene.add(dirLight);
+    
+    updateEditorPreview();
+}
+
+function createEditorGeometry(shape, size) {
+    switch (shape) {
+        case 'box':
+            return new THREE.BoxGeometry(size.w, size.h, size.d);
+        case 'sphere':
+            return new THREE.SphereGeometry(size.w / 2, 16, 16);
+        case 'cylinder':
+            return new THREE.CylinderGeometry(size.w / 2, size.w / 2, size.h, 16);
+        case 'cone':
+            return new THREE.ConeGeometry(size.w / 2, size.h, 16);
+        case 'plane':
+            return new THREE.PlaneGeometry(size.w, size.d);
+        case 'ramp':
+            const rampShape = new THREE.Shape();
+            rampShape.moveTo(0, 0);
+            rampShape.lineTo(size.d, 0);
+            rampShape.lineTo(size.d, size.h);
+            rampShape.lineTo(0, 0);
+            const extrudeSettings = { depth: size.w, bevelEnabled: false };
+            return new THREE.ExtrudeGeometry(rampShape, extrudeSettings);
+        default:
+            return new THREE.BoxGeometry(size.w, size.h, size.d);
+    }
+}
+
+function updateEditorPreview() {
+    if (!mapEditor.previewScene) return;
+    
+    if (mapEditor.previewMesh) {
+        mapEditor.previewScene.remove(mapEditor.previewMesh);
+        mapEditor.previewMesh.geometry.dispose();
+        mapEditor.previewMesh.material.dispose();
+    }
+    
+    const geo = createEditorGeometry(mapEditor.selectedShape, mapEditor.objectSize);
+    const mat = new THREE.MeshStandardMaterial({ color: mapEditor.selectedColor });
+    mapEditor.previewMesh = new THREE.Mesh(geo, mat);
+    
+    if (mapEditor.selectedShape === 'plane') {
+        mapEditor.previewMesh.rotation.x = -Math.PI / 2;
+    }
+    if (mapEditor.selectedShape === 'ramp') {
+        mapEditor.previewMesh.position.set(-mapEditor.objectSize.w / 2, 0, -mapEditor.objectSize.d / 2);
+    }
+    
+    mapEditor.previewScene.add(mapEditor.previewMesh);
+    
+    // Auto-rotate preview
+    if (mapEditor.previewMesh) {
+        mapEditor.previewMesh.rotation.y = Date.now() * 0.001;
+    }
+    
+    mapEditor.previewRenderer.render(mapEditor.previewScene, mapEditor.previewCamera);
+}
+
+function animateEditorPreview() {
+    if (!mapEditor.active) return;
+    requestAnimationFrame(animateEditorPreview);
+    if (mapEditor.previewMesh) {
+        mapEditor.previewMesh.rotation.y = Date.now() * 0.001;
+    }
+    mapEditor.previewRenderer.render(mapEditor.previewScene, mapEditor.previewCamera);
+}
+
+function createGhostMesh() {
+    if (mapEditor.ghostMesh) {
+        scene.remove(mapEditor.ghostMesh);
+        mapEditor.ghostMesh.geometry.dispose();
+        mapEditor.ghostMesh.material.dispose();
+    }
+    
+    const geo = createEditorGeometry(mapEditor.selectedShape, mapEditor.objectSize);
+    const mat = new THREE.MeshStandardMaterial({ 
+        color: mapEditor.selectedColor,
+        transparent: true,
+        opacity: 0.6
+    });
+    mapEditor.ghostMesh = new THREE.Mesh(geo, mat);
+    mapEditor.ghostMesh.rotation.y = mapEditor.rotation;
+    
+    if (mapEditor.selectedShape === 'plane') {
+        mapEditor.ghostMesh.rotation.x = -Math.PI / 2;
+    }
+    
+    scene.add(mapEditor.ghostMesh);
+}
+
+function updateGhostPosition(event) {
+    if (!mapEditor.ghostMesh || !mapEditor.active) return;
+    
+    const rect = renderer.domElement.getBoundingClientRect();
+    const mouse = new THREE.Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1
+    );
+    
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+    
+    // Raycast against editor floor and placed objects
+    const floorTarget = mapEditor.editorFloor || floor;
+    const targets = [floorTarget, ...mapEditor.placedObjects.map(o => o.mesh)];
+    const intersects = raycaster.intersectObjects(targets);
+    
+    if (intersects.length > 0) {
+        const hit = intersects[0];
+        const pos = hit.point.clone();
+        
+        // Snap to grid (0.5 units)
+        pos.x = Math.round(pos.x * 2) / 2;
+        pos.z = Math.round(pos.z * 2) / 2;
+        
+        // Place on top of hit surface
+        if (mapEditor.selectedShape === 'plane') {
+            pos.y = hit.point.y + 0.01;
+        } else {
+            pos.y = hit.point.y + mapEditor.objectSize.h / 2;
+        }
+        
+        mapEditor.ghostMesh.position.copy(pos);
+    }
+}
+
+function placeObject() {
+    if (!mapEditor.ghostMesh) return;
+    
+    const geo = createEditorGeometry(mapEditor.selectedShape, { ...mapEditor.objectSize });
+    const mat = new THREE.MeshStandardMaterial({ color: mapEditor.selectedColor });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(mapEditor.ghostMesh.position);
+    mesh.rotation.copy(mapEditor.ghostMesh.rotation);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    
+    scene.add(mesh);
+    obstacles.push(mesh);
+    
+    mapEditor.placedObjects.push({
+        mesh,
+        shape: mapEditor.selectedShape,
+        color: mapEditor.selectedColor,
+        size: { ...mapEditor.objectSize },
+        position: mesh.position.clone(),
+        rotation: mesh.rotation.clone()
+    });
+}
+
+function removeObjectAt(event) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    const mouse = new THREE.Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1
+    );
+    
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+    
+    const meshes = mapEditor.placedObjects.map(o => o.mesh);
+    const intersects = raycaster.intersectObjects(meshes);
+    
+    if (intersects.length > 0) {
+        const hitMesh = intersects[0].object;
+        const index = mapEditor.placedObjects.findIndex(o => o.mesh === hitMesh);
+        if (index !== -1) {
+            scene.remove(hitMesh);
+            const obsIdx = obstacles.indexOf(hitMesh);
+            if (obsIdx !== -1) obstacles.splice(obsIdx, 1);
+            hitMesh.geometry.dispose();
+            hitMesh.material.dispose();
+            mapEditor.placedObjects.splice(index, 1);
+        }
+    }
+}
+
+function setupEditorScene() {
+    // Store original game objects visibility
+    mapEditor.hiddenObjects = [];
+    
+    // Backup current map state once and hide it while editing
+    if (!mapEditor.savedColliders) {
+        mapEditor.savedColliders = colliders.slice();
+    }
+    mapEditor.mapWasVisible = mapGroup.visible;
+    mapGroup.visible = false;
+
+    // Editor uses its own collision list
+    colliders.length = 0;
+    
+    // Hide all game obstacles (but not lights!)
+    if (obstacles.length) {
+        obstacles.forEach(o => {
+            if (o.visible) {
+                mapEditor.hiddenObjects.push(o);
+                o.visible = false;
+            }
+        });
+    }
+    if (floor) {
+        floor.visible = false;
+    }
+    enemies.forEach(e => { if (e.mesh) e.mesh.visible = false; });
+    
+    // Create editor floor if not exists
+    if (!mapEditor.editorFloor) {
+        const floorGeo = new THREE.PlaneGeometry(100, 100);
+        const floorMat = new THREE.MeshStandardMaterial({ 
+            color: 0x2a2a4e,
+            roughness: 0.8
+        });
+        mapEditor.editorFloor = new THREE.Mesh(floorGeo, floorMat);
+        mapEditor.editorFloor.rotation.x = -Math.PI / 2;
+        mapEditor.editorFloor.receiveShadow = true;
+        
+        // Add grid helper
+        mapEditor.gridHelper = new THREE.GridHelper(100, 50, 0x555555, 0x444444);
+        mapEditor.gridHelper.position.y = 0.02;
+    }
+    
+    scene.add(mapEditor.editorFloor);
+    scene.add(mapEditor.gridHelper);
+    if (mapEditor.gridHelper) {
+        mapEditor.gridHelper.visible = true;
+    }
+    if (mapEditor.editorFloor) {
+        mapEditor.editorFloor.visible = true;
+    }
+    
+    // Add starting platform only if no objects yet
+    if (mapEditor.placedObjects.length === 0) {
+        const platformGeo = new THREE.BoxGeometry(10, 1, 10);
+        const platformMat = new THREE.MeshStandardMaterial({ color: 0x5a5a8a });
+        const platform = new THREE.Mesh(platformGeo, platformMat);
+        platform.position.set(0, 0.5, 0);
+        platform.castShadow = true;
+        platform.receiveShadow = true;
+        scene.add(platform);
+        
+        mapEditor.placedObjects.push({
+            mesh: platform,
+            shape: 'box',
+            color: '#5a5a8a',
+            size: { w: 10, h: 1, d: 10 },
+            position: platform.position.clone(),
+            rotation: platform.rotation.clone()
+        });
+    } else {
+        // Re-add existing placed objects to scene
+        mapEditor.placedObjects.forEach(obj => {
+            if (!scene.children.includes(obj.mesh)) {
+                scene.add(obj.mesh);
+            }
+        });
+    }
+}
+
+function cleanupEditorScene() {
+    // Remove editor-specific objects
+    if (mapEditor.editorFloor) {
+        scene.remove(mapEditor.editorFloor);
+    }
+    if (mapEditor.gridHelper) {
+        scene.remove(mapEditor.gridHelper);
+    }
+    
+    // Remove placed editor objects from scene and obstacles
+    mapEditor.placedObjects.forEach(obj => {
+        scene.remove(obj.mesh);
+        const idx = obstacles.indexOf(obj.mesh);
+        if (idx !== -1) obstacles.splice(idx, 1);
+        obj.mesh.geometry.dispose();
+        obj.mesh.material.dispose();
+    });
+    mapEditor.placedObjects = [];
+    
+    // Show game objects again
+    mapEditor.hiddenObjects.forEach(o => o.visible = true);
+    mapEditor.hiddenObjects = [];
+    if (floor) {
+        floor.visible = true;
+    }
+    enemies.forEach(e => { if (e.mesh) e.mesh.visible = true; });
+    
+    // Restore original map visibility and colliders
+    if (mapEditor.savedColliders) {
+        colliders.length = 0;
+        colliders.push(...mapEditor.savedColliders);
+        mapEditor.savedColliders = null;
+    }
+    mapGroup.visible = mapEditor.mapWasVisible !== undefined ? mapEditor.mapWasVisible : true;
+}
+
+function startMapEditor() {
+    mapEditor.active = true;
+    document.getElementById('menu').style.display = 'none';
+    document.getElementById('map-editor').style.display = 'block';
+    document.getElementById('hud').style.display = 'none';
+    document.getElementById('crosshair').style.display = 'none';
+    
+    // Save original scene settings
+    if (!mapEditor.originalBackground) {
+        mapEditor.originalBackground = scene.background;
+        mapEditor.originalFog = scene.fog;
+    }
+    
+    // Set editor background
+    scene.background = new THREE.Color(0x1a1a2e);
+    scene.fog = null;
+    
+    // Setup empty editor scene
+    setupEditorScene();
+    
+    // Reset camera for editor
+    camera.position.set(0, 30, 30);
+    camera.lookAt(0, 0, 0);
+    editorCameraState.orbitAngle = 0;
+    editorCameraState.orbitHeight = 30;
+    editorCameraState.orbitDistance = 40;
+    editorCameraState.target.set(0, 0, 0);
+    updateEditorCamera();
+    
+    // Init preview if not done
+    if (!mapEditor.previewRenderer) {
+        initEditorPreview();
+    }
+    
+    createGhostMesh();
+    animateEditorPreview();
+    
+    // Start editor render loop
+    editorAnimate();
+}
+
+function exitMapEditor() {
+    mapEditor.active = false;
+    document.getElementById('map-editor').style.display = 'none';
+    document.getElementById('menu').style.display = 'flex';
+    
+    if (mapEditor.ghostMesh) {
+        scene.remove(mapEditor.ghostMesh);
+        mapEditor.ghostMesh.geometry.dispose();
+        mapEditor.ghostMesh.material.dispose();
+        mapEditor.ghostMesh = null;
+    }
+    
+    // Restore original scene settings
+    if (mapEditor.originalBackground) {
+        scene.background = mapEditor.originalBackground;
+    }
+    if (mapEditor.originalFog) {
+        scene.fog = mapEditor.originalFog;
+    }
+    
+    // Cleanup editor scene (also clears placed objects)
+    cleanupEditorScene();
+}
+
+function clearEditorObjects() {
+    mapEditor.placedObjects.forEach(obj => {
+        scene.remove(obj.mesh);
+        const idx = obstacles.indexOf(obj.mesh);
+        if (idx !== -1) obstacles.splice(idx, 1);
+        obj.mesh.geometry.dispose();
+        obj.mesh.material.dispose();
+    });
+    mapEditor.placedObjects = [];
+}
+
+function saveEditorMap() {
+    const data = mapEditor.placedObjects.map(obj => ({
+        shape: obj.shape,
+        color: obj.color,
+        size: obj.size,
+        position: { x: obj.position.x, y: obj.position.y, z: obj.position.z },
+        rotation: { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z }
+    }));
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'standoff-map.json';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function loadEditorMap() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const data = JSON.parse(ev.target.result);
+                clearEditorObjects();
+                data.forEach(obj => {
+                    const geo = createEditorGeometry(obj.shape, obj.size);
+                    const mat = new THREE.MeshStandardMaterial({ color: obj.color });
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.position.set(obj.position.x, obj.position.y, obj.position.z);
+                    mesh.rotation.set(obj.rotation.x, obj.rotation.y, obj.rotation.z);
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+                    scene.add(mesh);
+                    obstacles.push(mesh);
+                    mapEditor.placedObjects.push({
+                        mesh,
+                        shape: obj.shape,
+                        color: obj.color,
+                        size: obj.size,
+                        position: mesh.position.clone(),
+                        rotation: mesh.rotation.clone()
+                    });
+                });
+            } catch (err) {
+                console.error('Failed to load map:', err);
+            }
+        };
+        reader.readAsText(file);
+    };
+    input.click();
+}
+
+function testEditorMap() {
+    mapEditor.active = false;
+    mapEditor.testMode = true;
+    document.getElementById('map-editor').style.display = 'none';
+    mapGroup.visible = false;
+    
+    if (mapEditor.ghostMesh) {
+        scene.remove(mapEditor.ghostMesh);
+        mapEditor.ghostMesh.geometry.dispose();
+        mapEditor.ghostMesh.material.dispose();
+        mapEditor.ghostMesh = null;
+    }
+    
+    // Hide grid for cleaner look
+    if (mapEditor.gridHelper) {
+        mapEditor.gridHelper.visible = false;
+    }
+    
+    // Fresh collision list only with editor content
+    colliders.length = 0;
+    
+    // Add editor floor to colliders for ground detection
+    if (mapEditor.editorFloor) {
+        mapEditor.editorFloor.visible = true;
+        colliders.push({ 
+            mesh: mapEditor.editorFloor,
+            box: new THREE.Box3().setFromObject(mapEditor.editorFloor)
+        });
+    }
+    
+    // Add placed objects to colliders and obstacles for collision
+    mapEditor.placedObjects.forEach(obj => {
+        if (!obstacles.includes(obj.mesh)) {
+            obstacles.push(obj.mesh);
+        }
+        colliders.push({ 
+            mesh: obj.mesh,
+            box: new THREE.Box3().setFromObject(obj.mesh)
+        });
+    });
+    
+    // Reset player state
+    state.isPlaying = true;
+    state.health = CONFIG.player.maxHealth;
+    state.ammo = CONFIG.rifle.magSize;
+    state.reserveAmmo = CONFIG.rifle.reserveAmmo;
+    state.isReloading = false;
+    state.currentWeapon = 'rifle';
+    state.velocity = new THREE.Vector3();
+    state.isGrounded = true;
+    
+    // Position player on the platform
+    camera.position.set(0, CONFIG.player.height + 1.5, 5);
+    camera.rotation.set(0, Math.PI, 0);
+    
+    // Show HUD
+    document.getElementById('hud').style.display = 'block';
+    document.getElementById('crosshair').style.display = 'block';
+    document.getElementById('menu').style.display = 'none';
+    
+    // Show weapon
+    switchWeapon('rifle');
+    updateAmmoDisplay();
+    updateHealthBar();
+    
+    if (!isMobile) {
+        document.getElementById('game-container').requestPointerLock();
+    }
+    if (isMobile) {
+        document.getElementById('mobile-controls').classList.add('active');
+    }
+}
+
+function exitTestMode() {
+    if (!mapEditor.testMode) return;
+    
+    mapEditor.testMode = false;
+    state.isPlaying = false;
+    
+    // Remove editor floor from colliders
+    if (mapEditor.editorFloor) {
+        const floorIdx = colliders.findIndex(c => c.mesh === mapEditor.editorFloor);
+        if (floorIdx !== -1) colliders.splice(floorIdx, 1);
+    }
+    
+    // Remove placed objects from obstacles and colliders
+    mapEditor.placedObjects.forEach(obj => {
+        const idx = obstacles.indexOf(obj.mesh);
+        if (idx !== -1) obstacles.splice(idx, 1);
+        const colIdx = colliders.findIndex(c => c.mesh === obj.mesh);
+        if (colIdx !== -1) colliders.splice(colIdx, 1);
+    });
+    colliders.length = 0;
+    
+    // Hide HUD
+    document.getElementById('hud').style.display = 'none';
+    document.getElementById('crosshair').style.display = 'none';
+    document.getElementById('mobile-controls').classList.remove('active');
+    
+    if (!isMobile) document.exitPointerLock();
+    
+    // Return to editor
+    startMapEditor();
+}
+
+// Editor camera controls
+const editorCameraState = {
+    isDragging: false,
+    lastX: 0,
+    lastY: 0,
+    orbitAngle: 0,
+    orbitHeight: 30,
+    orbitDistance: 40,
+    target: new THREE.Vector3(0, 0, 0)
+};
+
+function updateEditorCamera() {
+    const x = editorCameraState.target.x + Math.sin(editorCameraState.orbitAngle) * editorCameraState.orbitDistance;
+    const z = editorCameraState.target.z + Math.cos(editorCameraState.orbitAngle) * editorCameraState.orbitDistance;
+    camera.position.set(x, editorCameraState.orbitHeight, z);
+    camera.lookAt(editorCameraState.target);
+}
+
+function editorAnimate() {
+    if (!mapEditor.active) return;
+    requestAnimationFrame(editorAnimate);
+    renderer.render(scene, camera);
+}
+
+// Editor event listeners
+document.getElementById('map-editor-btn').addEventListener('click', startMapEditor);
+document.getElementById('editor-exit').addEventListener('click', exitMapEditor);
+document.getElementById('editor-clear').addEventListener('click', clearEditorObjects);
+document.getElementById('editor-save').addEventListener('click', saveEditorMap);
+document.getElementById('editor-load').addEventListener('click', loadEditorMap);
+document.getElementById('editor-test').addEventListener('click', testEditorMap);
+
+// Shape buttons
+document.querySelectorAll('.editor-shape-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.editor-shape-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        mapEditor.selectedShape = btn.dataset.shape;
+        createGhostMesh();
+        updateEditorPreview();
+    });
+});
+
+// Color buttons
+document.querySelectorAll('.editor-color-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.editor-color-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        mapEditor.selectedColor = btn.dataset.color;
+        createGhostMesh();
+        updateEditorPreview();
+    });
+});
+
+// Size inputs
+['w', 'h', 'd'].forEach(dim => {
+    document.getElementById(`editor-size-${dim}`).addEventListener('input', (e) => {
+        mapEditor.objectSize[dim] = parseFloat(e.target.value) || 1;
+        createGhostMesh();
+        updateEditorPreview();
+    });
+});
+
+// Mouse events for editor
+document.addEventListener('mousemove', (e) => {
+    if (!mapEditor.active) return;
+    
+    if (editorCameraState.isDragging) {
+        const dx = e.clientX - editorCameraState.lastX;
+        const dy = e.clientY - editorCameraState.lastY;
+        editorCameraState.orbitAngle += dx * 0.01;
+        editorCameraState.orbitHeight = Math.max(5, Math.min(100, editorCameraState.orbitHeight - dy * 0.5));
+        editorCameraState.lastX = e.clientX;
+        editorCameraState.lastY = e.clientY;
+        updateEditorCamera();
+    } else {
+        updateGhostPosition(e);
     }
 });
+
+document.addEventListener('mousedown', (e) => {
+    if (!mapEditor.active) return;
+    
+    // Check if clicking on UI
+    if (e.target.closest('#editor-toolbar') || 
+        e.target.closest('#editor-controls') || 
+        e.target.closest('#editor-preview') ||
+        e.target.closest('#editor-info')) {
+        return;
+    }
+    
+    if (e.button === 0) { // Left click - place
+        placeObject();
+    } else if (e.button === 2) { // Right click - remove or orbit
+        removeObjectAt(e);
+    } else if (e.button === 1) { // Middle click - orbit camera
+        editorCameraState.isDragging = true;
+        editorCameraState.lastX = e.clientX;
+        editorCameraState.lastY = e.clientY;
+    }
+});
+
+document.addEventListener('mouseup', (e) => {
+    if (e.button === 1) {
+        editorCameraState.isDragging = false;
+    }
+});
+
+document.addEventListener('wheel', (e) => {
+    if (!mapEditor.active) return;
+    
+    if (e.shiftKey) {
+        // Change size with scroll + shift
+        const delta = e.deltaY > 0 ? -0.5 : 0.5;
+        mapEditor.objectSize.w = Math.max(0.5, Math.min(50, mapEditor.objectSize.w + delta));
+        mapEditor.objectSize.h = Math.max(0.5, Math.min(50, mapEditor.objectSize.h + delta));
+        mapEditor.objectSize.d = Math.max(0.5, Math.min(50, mapEditor.objectSize.d + delta));
+        document.getElementById('editor-size-w').value = mapEditor.objectSize.w;
+        document.getElementById('editor-size-h').value = mapEditor.objectSize.h;
+        document.getElementById('editor-size-d').value = mapEditor.objectSize.d;
+        createGhostMesh();
+        updateEditorPreview();
+    } else {
+        // Zoom camera
+        editorCameraState.orbitDistance = Math.max(10, Math.min(100, editorCameraState.orbitDistance + e.deltaY * 0.05));
+        updateEditorCamera();
+    }
+});
+
+document.addEventListener('keydown', (e) => {
+    if (!mapEditor.active) return;
+    
+    const moveSpeed = 2;
+    switch (e.code) {
+        case 'KeyW':
+            editorCameraState.target.z -= moveSpeed;
+            updateEditorCamera();
+            break;
+        case 'KeyS':
+            editorCameraState.target.z += moveSpeed;
+            updateEditorCamera();
+            break;
+        case 'KeyA':
+            editorCameraState.target.x -= moveSpeed;
+            updateEditorCamera();
+            break;
+        case 'KeyD':
+            editorCameraState.target.x += moveSpeed;
+            updateEditorCamera();
+            break;
+        case 'KeyR':
+            mapEditor.rotation += Math.PI / 4;
+            if (mapEditor.ghostMesh) {
+                mapEditor.ghostMesh.rotation.y = mapEditor.rotation;
+            }
+            break;
+        case 'Escape':
+            exitMapEditor();
+            break;
+    }
+});
+
+// Prevent context menu in editor
+document.getElementById('map-editor').addEventListener('contextmenu', (e) => e.preventDefault());
 
 // Exit button (leave match or back to menu) - only for mobile/multiplayer
 document.getElementById('exit-btn').addEventListener('click', () => {
@@ -5036,6 +6705,13 @@ document.addEventListener('keydown', (e) => {
             return;
         }
         
+        // Exit test mode back to editor
+        if (mapEditor.testMode) {
+            e.preventDefault();
+            exitTestMode();
+            return;
+        }
+        
         // Otherwise exit to menu if playing
         if (state.isPlaying) {
             e.preventDefault();
@@ -5171,6 +6847,17 @@ if (adminPartyLocal) {
     });
 }
 
+const adminSandboxClear = document.getElementById('admin-sandbox-clear');
+if (adminSandboxClear) {
+    adminSandboxClear.addEventListener('click', () => {
+        clearSandboxObjectsLocal();
+        if (!mpSocket || !mpSocket.connected) connectMultiplayer();
+        if (mpSocket) {
+            mpSocket.emit('sandboxClear');
+        }
+    });
+}
+
 if (adminToggle) {
     adminToggle.addEventListener('change', () => {
         if (adminToggle.checked) {
@@ -5265,6 +6952,9 @@ const clock = new THREE.Clock();
 function animate() {
     requestAnimationFrame(animate);
     
+    // Don't render if map editor is active (it has its own render loop)
+    if (mapEditor.active) return;
+    
     const delta = Math.min(clock.getDelta(), 0.1);
     
     if (state.isPlaying) {
@@ -5297,6 +6987,7 @@ function animate() {
     updateTracers(delta);
     updateGrenades(delta);
     updateFireworks(delta);
+    updatePartyEffects(delta);
     if (!state.isMultiplayer) {
         updateBomb(delta);
     }
@@ -6055,6 +7746,11 @@ function handleRemoteShoot({ id }) {
     } catch (e) {}
 }
 
+function updateMpStatus(text) {
+    const status = document.getElementById('mp-status');
+    if (status) status.textContent = text;
+}
+
 function connectMultiplayer() {
     if (mpSocket) return;
     if (!window.io) { console.warn('Socket.IO client not loaded'); return; }
@@ -6064,14 +7760,13 @@ function connectMultiplayer() {
         if (mpSendInterval) clearInterval(mpSendInterval);
         mpSendInterval = setInterval(sendPlayerState, 50); // 20 tps
         if (state.isMultiplayer) {
-            joinMatchmaking();
+            joinCurrentMpMode();
         }
     });
 
     mpSocket.on('connect_error', (err) => {
         console.warn('MP connect_error', err.message);
-        const btn = document.getElementById('mp-btn');
-        if (btn) btn.textContent = 'Ошибка подключения';
+        updateMpStatus('Ошибка подключения');
     });
     mpSocket.on('error', (err) => {
         console.warn('MP error', err);
@@ -6081,16 +7776,14 @@ function connectMultiplayer() {
         if (mpSendInterval) { clearInterval(mpSendInterval); mpSendInterval = null; }
         resetRemotePlayers();
         state.isSearchingMatch = false;
-        const btn = document.getElementById('mp-btn');
-        if (btn) btn.textContent = 'Играть мультиплеер 1v1';
+        updateMpStatus('Отключено');
         mpSocket = null;
     });
 
     mpSocket.on('waiting', () => {
         if (!state.isMultiplayer) return;
         state.isSearchingMatch = true;
-        const btn = document.getElementById('mp-btn');
-        if (btn) btn.textContent = 'Поиск соперника...';
+        updateMpStatus('Поиск соперника...');
     });
 
     mpSocket.on('matchFound', ({ room, spawnIndex = 0, opponentId }) => {
@@ -6101,8 +7794,48 @@ function connectMultiplayer() {
         state.isSearchingMatch = false;
         const spawn = getAimSpawn(spawnIndex);
         resetGame({ skipEnemies: true, position: spawn });
-        const btn = document.getElementById('mp-btn');
-        if (btn) btn.textContent = 'Играем 1v1';
+        updateMpStatus('Играем 1v1');
+    });
+
+    mpSocket.on('ffaJoined', ({ room, spawnIndex = 0 }) => {
+        if (state.mpMode !== 'ffa') return;
+        state.mpRoom = room;
+        state.mpSpawnIndex = spawnIndex;
+        state.isSearchingMatch = false;
+        resetGame({ skipEnemies: true, position: getFfaSpawn(spawnIndex) });
+        updateMpStatus('FFA: бой начался');
+    });
+
+    mpSocket.on('teamJoined', ({ room, spawnIndex = 0, team = null }) => {
+        if (state.mpMode !== 'team') return;
+        state.mpRoom = room;
+        state.mpSpawnIndex = spawnIndex;
+        state.mpTeam = team;
+        state.isSearchingMatch = false;
+        resetGame({ skipEnemies: true, position: getTeamSpawn(spawnIndex) });
+        updateMpStatus(`Команды: ${team || 'бой'}`);
+    });
+
+    mpSocket.on('sandboxJoined', ({ room, objects = [] }) => {
+        if (state.mpMode !== 'sandbox') return;
+        state.mpRoom = room;
+        state.isSearchingMatch = false;
+        state.sandbox.active = true;
+        updateMpStatus('Песочница: на сервере');
+        clearSandboxObjectsLocal();
+        objects.forEach(obj => addSandboxObject(obj, false));
+        const panel = document.getElementById('sandbox-tools');
+        if (panel) panel.style.display = 'block';
+    });
+
+    mpSocket.on('sandboxPlace', (data) => {
+        if (state.mpMode !== 'sandbox') return;
+        addSandboxObject(data, false);
+    });
+
+    mpSocket.on('sandboxClear', () => {
+        if (state.mpMode !== 'sandbox') return;
+        clearSandboxObjectsLocal();
     });
 
     mpSocket.on('state', handleRemoteState);
@@ -6127,15 +7860,13 @@ function disconnectMultiplayer() {
     if (mpSendInterval) { clearInterval(mpSendInterval); mpSendInterval = null; }
     if (mpSocket) { mpSocket.disconnect(); mpSocket = null; }
     resetRemotePlayers();
-    const btn = document.getElementById('mp-btn');
-    if (btn) btn.textContent = 'Играть мультиплеер 1v1';
+    updateMpStatus('');
 }
 
 function joinMatchmaking() {
     if (!mpSocket || !mpSocket.connected) return;
     state.isSearchingMatch = true;
-    const btn = document.getElementById('mp-btn');
-    if (btn) btn.textContent = 'Поиск соперника...';
+    updateMpStatus('Поиск соперника...');
     mpSocket.emit('join1v1');
 }
 
