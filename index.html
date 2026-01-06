@@ -5051,11 +5051,12 @@ function shoot() {
 
 
 // Knife attack function
+let knifeAnimating = false;
 function knifeAttack() {
     if (!state.isPlaying) return;
-    if (state.knifeCooldown) return;
+    if (state.knifeCooldown || knifeAnimating) return;
     state.knifeCooldown = true;
-    state.canShoot = true; // не блокируем стрельбу других видов оружия
+    knifeAnimating = true;
     
     // Play knife sound
     try {
@@ -5065,10 +5066,12 @@ function knifeAttack() {
         }
     } catch (e) {}
     
-    // Knife swing animation
-    const originalRot = knifeGroup.rotation.x;
+    // Knife swing animation - always return to 0
     knifeGroup.rotation.x = -1;
-    setTimeout(() => { knifeGroup.rotation.x = originalRot; }, 200);
+    setTimeout(() => { 
+        knifeGroup.rotation.x = 0; 
+        knifeAnimating = false;
+    }, 200);
     
     // Check for enemies in range
     const knifeRange = CONFIG.knife.range;
@@ -5123,11 +5126,11 @@ function knifeAttack() {
         }
     });
     
-    // Cooldown
+    // Cooldown - single timeout
     const knifeDelay = CONFIG.knife.fireRate || 500;
-    setTimeout(() => { state.knifeCooldown = false; }, Math.min(knifeDelay, 250));
-    setTimeout(() => { state.knifeCooldown = false; }, knifeDelay);
-    setTimeout(() => { state.knifeCooldown = false; }, knifeDelay * 2); // страховка
+    setTimeout(() => { 
+        state.knifeCooldown = false; 
+    }, knifeDelay);
 }
 function reload() {
     const isSniper = state.currentWeapon === 'sniper';
