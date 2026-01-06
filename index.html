@@ -204,6 +204,34 @@
             border-bottom: 1px solid #444;
             padding-bottom: 10px;
         }
+        #editor-map-mode {
+            width: 100%;
+            padding: 8px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid #444;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+        #editor-map-mode option {
+            background: #1a1a2e;
+            color: #fff;
+        }
+        #editor-spawns-info {
+            color: #aaa;
+            font-size: 11px;
+            text-align: center;
+            margin-bottom: 10px;
+            padding: 6px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+        }
+        #editor-spawns-info span {
+            color: #4ade80;
+            font-weight: bold;
+        }
         .editor-shape-btn {
             width: 60px;
             height: 60px;
@@ -254,6 +282,22 @@
         .editor-color-btn.active {
             border-color: #fff;
             box-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+        #editor-color-picker {
+            width: 28px;
+            height: 28px;
+            border: 2px solid #333;
+            border-radius: 4px;
+            cursor: pointer;
+            padding: 0;
+            background: transparent;
+        }
+        #editor-color-picker::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+        #editor-color-picker::-webkit-color-swatch {
+            border: none;
+            border-radius: 2px;
         }
         #editor-controls {
             position: fixed;
@@ -1314,6 +1358,16 @@
     <!-- Map Editor -->
     <div id="map-editor">
         <div id="editor-toolbar">
+            <h3>Режим карты</h3>
+            <select id="editor-map-mode">
+                <option value="1v1">1v1 (2 спавна)</option>
+                <option value="5v5">5v5 (10 спавнов)</option>
+                <option value="ffa">FFA (∞ спавнов)</option>
+                <option value="sandbox">Песочница (∞)</option>
+            </select>
+            <div id="editor-spawns-info">Спавнов: <span id="spawns-placed">0</span> / <span id="spawns-needed">2</span></div>
+            <h3>Инструменты</h3>
+            <button class="editor-shape-btn" data-shape="spawn" title="Точка спавна">🚩</button>
             <h3>Фигуры</h3>
             <button class="editor-shape-btn active" data-shape="box" title="Куб">📦</button>
             <button class="editor-shape-btn" data-shape="sphere" title="Сфера">🔮</button>
@@ -1338,11 +1392,12 @@
                 <button class="editor-color-btn" data-color="#1a1a2e" style="background:#1a1a2e"></button>
                 <button class="editor-color-btn" data-color="#2d3436" style="background:#2d3436"></button>
                 <button class="editor-color-btn" data-color="#6c5ce7" style="background:#6c5ce7"></button>
+                <input type="color" id="editor-color-picker" value="#e94560" title="Выбрать цвет">
             </div>
         </div>
         
         <div id="editor-info">
-            <kbd>ЛКМ</kbd> Поставить · <kbd>ПКМ</kbd> Удалить · <kbd>WASD</kbd> Движение · <kbd>Scroll</kbd> Размер · <kbd>R</kbd> Вращение · <kbd>ESC</kbd> Выход
+            <kbd>ЛКМ</kbd> Поставить · <kbd>ПКМ+Drag</kbd> Вращать камеру · <kbd>СКМ</kbd> Удалить · <kbd>WASD</kbd> Движение · <kbd>Scroll</kbd> Размер/Зум · <kbd>R</kbd> Вращение · <kbd>ESC</kbd> Выход
         </div>
         
         <div id="editor-preview">
@@ -1365,6 +1420,8 @@
         </div>
         
         <div id="editor-controls">
+            <button class="editor-ctrl-btn" id="editor-undo" title="Отменить (Ctrl+Z)">↩️</button>
+            <button class="editor-ctrl-btn" id="editor-redo" title="Повторить (Ctrl+Y)">↪️</button>
             <button class="editor-ctrl-btn" id="editor-clear">🗑️ Очистить</button>
             <button class="editor-ctrl-btn" id="editor-save">💾 Сохранить</button>
             <button class="editor-ctrl-btn" id="editor-load">📂 Загрузить</button>
@@ -1622,10 +1679,10 @@ const CONFIG = {
 };
 
 const DEFAULT_MAP_SIZE = CONFIG.map.size;
-const AIM_MAP_SIZE = 24;
+const AIM_MAP_SIZE = 32;
 const AIM_SPAWNS = [
-    { x: -12, z: -10 },
-    { x: 12, z: 10 }
+    { x: -1, y: 1.7, z: 14.5 },
+    { x: -1.5, y: 1.7, z: -14.5 }
 ];
 
 // ==================== GAME STATE ====================
@@ -1926,156 +1983,268 @@ function createBox(w, h, d, x, y, z, material, isCollider = true) {
 
 function createDefaultMap() {
     mapGroup.visible = true;
-    CONFIG.map.size = DEFAULT_MAP_SIZE;
+    CONFIG.map.size = 40;
     clearMap();
-    const S = CONFIG.map.size;
+    createSandstoneMap();
+}
 
+// Sandstone map - based on original minimap layout
+function createSandstoneMap() {
+    const sand = 0xC9A86C;       // Main walls
+    const sandDark = 0xA6845A;   // Darker areas
+    const sandLight = 0xDDC49A;  // Light floor
+    const wood = 0x7A5230;       // Crates
+    const site = 0xB87333;       // Bomb sites
+    const window = 0x4A3520;     // Window color
+    const palm = 0x228B22;       // Palm leaves
+    const trunk = 0x8B4513;      // Palm trunk
+    const fence = 0x8B7355;      // Fence color
+    
     // Ground
-    const groundGeo = new THREE.PlaneGeometry(S * 2, S * 2);
-    const ground = new THREE.Mesh(groundGeo, materials.sand);
+    const groundGeo = new THREE.PlaneGeometry(90, 90);
+    const ground = new THREE.Mesh(groundGeo, new THREE.MeshStandardMaterial({ color: sandDark }));
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     mapGroup.add(ground);
     floor = ground;
-
-    // Outer walls (sandstone perimeter)
-    createBox(S * 2, 5.5, 1, 0, 2.75, -S, materials.stone);
-    createBox(S * 2, 5.5, 1, 0, 2.75, S, materials.stone);
-    createBox(1, 5.5, S * 2, -S, 2.75, 0, materials.stone);
-    createBox(1, 5.5, S * 2, S, 2.75, 0, materials.stone);
-
-    // White plaster houses on edges for contrast
-    createBox(12, 6, 10, -32, 3, 10, materials.plaster);
-    createBox(10, 5, 8, 30, 2.5, -6, materials.plaster);
-    createBox(12, 5, 10, 18, 2.5, 30, materials.plaster);
-    createBox(10, 5, 10, -18, 2.5, -30, materials.plaster);
-
-    // Spawn platforms (CT / T)
-    createBox(14, 0.4, 14, -30, 0.2, -24, materials.sandDark);
-    createBox(14, 0.4, 14,  30, 0.2,  24, materials.sandDark);
-    createBox(3, 1.5, 3, -32, 0.75, -22, materials.wood);
-    createBox(3, 1.5, 3,  32, 0.75,  22, materials.wood);
-
-    // Mid double-door corridor
-    createBox(1, 4, 26, -7, 2, 0, materials.stone);
-    createBox(1, 4, 26,  7, 2, 0, materials.stone);
-    createBox(4, 3, 2, 0, 1.5, -13, materials.stone);
-    createBox(4, 3, 2, 0, 1.5,  13, materials.stone);
-
-    // Mid boxes / cover
-    createBox(3, 2, 2, -1, 1, -2, materials.concrete);
-    createBox(2.2, 1.2, 2.2, 2, 0.6, 3, materials.wood);
-    createBox(2.2, 1.2, 2.2, -3, 0.6, 5, materials.wood);
-
-    // Catwalk to A (elevated)
-    createBox(16, 0.6, 4, -12, 0.3, 14, materials.sandDark);
-    createBox(1, 3, 8, -20, 1.5, 14, materials.stone); // rail wall
-    createBox(4, 3.5, 2, -12, 1.75, 18, materials.stone); // small arch facade
-
-    // A site plaza with arches and crates
-    createBox(12, 0.4, 12, -22, 0.2, 20, materials.sandDark);
-    createBox(3, 3, 2, -24, 1.5, 24, materials.stone); // arch stub
-    createBox(3, 3, 2, -20, 1.5, 24, materials.stone);
-    createBox(2.6, 2.2, 2.6, -22, 1.1, 18, materials.concrete);
-    createBox(2.2, 1.2, 2.2, -24, 0.6, 22, materials.wood);
-    createBox(2.2, 1.2, 2.2, -20, 0.6, 22, materials.wood);
-    // planter feel
-    createBox(4, 0.6, 4, -18, 0.3, 20, materials.sandDark);
-
-    // Short to A (archway)
-    createBox(1, 4, 8, -14, 2, 8, materials.stone);
-    createBox(3, 3, 2, -14, 1.5, 4, materials.stone);
-
-    // Mid to B connector (arches)
-    createBox(1, 4, 12, 10, 2, -6, materials.stone);
-    createBox(3, 3, 2, 10, 1.5, -12, materials.stone);
-
-    // B tunnels (low ceiling feel)
-    createBox(1, 3.5, 16, 20, 1.75, -12, materials.stone);
-    createBox(1, 3.5, 16, 24, 1.75, -12, materials.stone);
-    createBox(4, 3, 2, 22, 1.5, -20, materials.stone);
-
-    // B site plateau with stairs
-    createBox(14, 0.5, 14, 28, 0.25, -18, materials.sandDark);
-    createBox(3, 2, 3, 30, 1, -18, materials.concrete);
-    createBox(2, 1.4, 2, 26, 0.7, -16, materials.wood);
-    createBox(2, 1.4, 2, 26, 0.7, -20, materials.wood);
-    // stairs up to plateau (stepped boxes)
-    createBox(6, 0.4, 2, 22, 0.2, -14, materials.sandDark);
-    createBox(6, 0.8, 2, 22, 0.4, -12, materials.sandDark);
-    createBox(6, 1.2, 2, 22, 0.6, -10, materials.sandDark);
-
-    // Palm planters / small covers for flavor
-    createBox(2.5, 1, 2.5, -30, 0.5, 8, materials.sandDark);
-    createBox(2.5, 1, 2.5, 30, 0.5, -8, materials.sandDark);
-
-    // Extra boundary props
-    const props = [
-        [12, 1.2, 3, -30, 0.6, -30, materials.metal],
-        [10, 1.0, 2,  30, 0.5,  30, materials.metal]
-    ];
-    props.forEach(([w,h,d,x,y,z,mat]) => createBox(w,h,d,x,y,z,mat));
+    
+    // === BOUNDARY WALLS ===
+    createColorBox(90, 5, 1, 0, 2.5, -45, sand);
+    createColorBox(90, 5, 1, 0, 2.5, 45, sand);
+    createColorBox(1, 5, 90, -45, 2.5, 0, sand);
+    createColorBox(1, 5, 90, 45, 2.5, 0, sand);
+    
+    // === T SPAWN (bottom-left) ===
+    createColorBox(12, 0.2, 10, -35, 0.1, 30, sandLight);
+    
+    // === CT SPAWN (top-right) ===
+    createColorBox(12, 0.2, 10, 35, 0.1, -30, sandLight);
+    
+    // === MID (center) ===
+    createColorBox(14, 0.2, 14, 0, 0.1, 0, sandLight);
+    // Fountain
+    createColorCylinder(2, 0.4, 0, 0.2, 0, sandDark);
+    
+    // === SITE A (top-left) ===
+    createColorBox(12, 0.2, 10, -28, 0.1, -20, site);
+    createColorBox(1, 4, 14, -22, 2, -20, sand);
+    createColorBox(10, 4, 1, -28, 2, -13, sand);
+    
+    // === ГРОБЫ / Graveyard ===
+    createColorBox(8, 0.2, 8, -10, 0.1, -25, sandDark);
+    createColorBox(2, 1.5, 4, -12, 0.75, -25, sand);
+    createColorBox(2, 1.5, 4, -8, 0.75, -25, sand);
+    
+    // === SITE B (bottom-right) ===
+    createColorBox(12, 0.2, 10, 28, 0.1, 20, site);
+    createColorBox(1, 4, 14, 22, 2, 20, sand);
+    createColorBox(10, 4, 1, 28, 2, 13, sand);
+    
+    // === ЧЕТВЕРКА ===
+    createColorBox(8, 0.2, 8, 10, 0.1, 25, sandDark);
+    
+    // === ЦЕМЕНТ ===
+    createColorBox(8, 0.2, 8, 25, 0.1, -5, sandDark);
+    
+    // === BUILDINGS WITH DETAILS ===
+    // Building 1 (top-left) - 2 floors with windows
+    createColorBox(14, 5, 10, -35, 2.5, -15, sand);
+    createColorBox(14, 2, 10, -35, 6, -15, sandDark); // Roof
+    createColorBox(2, 1.5, 0.3, -30, 2.5, -10, window); // Window
+    createColorBox(2, 1.5, 0.3, -35, 2.5, -10, window);
+    createColorBox(2, 1.5, 0.3, -40, 2.5, -10, window);
+    
+    // Building 2 (top-right) - tall
+    createColorBox(14, 6, 10, 35, 3, -15, sand);
+    createColorBox(14, 1.5, 10, 35, 6.75, -15, sandDark);
+    createColorBox(2, 1.5, 0.3, 30, 3, -10, window);
+    createColorBox(2, 1.5, 0.3, 35, 3, -10, window);
+    createColorBox(2, 1.5, 0.3, 40, 3, -10, window);
+    
+    // Building 3 (bottom-left)
+    createColorBox(14, 4, 10, -35, 2, 15, sand);
+    createColorBox(14, 1.5, 10, -35, 4.75, 15, sandDark);
+    createColorBox(2, 1.5, 0.3, -30, 2.5, 20, window);
+    createColorBox(2, 1.5, 0.3, -40, 2.5, 20, window);
+    
+    // Building 4 (bottom-right)
+    createColorBox(14, 5, 10, 35, 2.5, 15, sand);
+    createColorBox(14, 1.5, 10, 35, 5.75, 15, sandDark);
+    createColorBox(2, 1.5, 0.3, 30, 3, 20, window);
+    createColorBox(2, 1.5, 0.3, 40, 3, 20, window);
+    
+    // === CENTER BUILDINGS ===
+    // Left of mid
+    createColorBox(8, 4, 8, -18, 2, 0, sand);
+    createColorBox(8, 1, 8, -18, 4.5, 0, sandDark);
+    // Right of mid
+    createColorBox(8, 4, 8, 18, 2, 0, sand);
+    createColorBox(8, 1, 8, 18, 4.5, 0, sandDark);
+    // Above mid
+    createColorBox(8, 4, 6, 0, 2, -15, sand);
+    // Below mid
+    createColorBox(8, 4, 6, 0, 2, 15, sand);
+    
+    // === CORRIDOR WALLS ===
+    createColorBox(1, 4, 20, -10, 2, -28, sand);
+    createColorBox(1, 4, 20, 10, 2, -28, sand);
+    createColorBox(1, 4, 20, -10, 2, 28, sand);
+    createColorBox(1, 4, 20, 10, 2, 28, sand);
+    
+    // === PALM TREES ===
+    // Palm 1 near T spawn
+    createColorCylinder(0.4, 5, -38, 2.5, 35, trunk);
+    createColorBox(4, 0.3, 0.6, -38, 5.2, 35, palm);
+    createColorBox(0.6, 0.3, 4, -38, 5.2, 35, palm);
+    createColorBox(3, 0.2, 3, -38, 5, 35, 0x2E8B2E);
+    
+    // Palm 2 near CT spawn
+    createColorCylinder(0.4, 5, 38, 2.5, -35, trunk);
+    createColorBox(4, 0.3, 0.6, 38, 5.2, -35, palm);
+    createColorBox(0.6, 0.3, 4, 38, 5.2, -35, palm);
+    createColorBox(3, 0.2, 3, 38, 5, -35, 0x2E8B2E);
+    
+    // Palm 3 near mid
+    createColorCylinder(0.35, 4, -8, 2, 8, trunk);
+    createColorBox(3, 0.2, 0.5, -8, 4.2, 8, palm);
+    createColorBox(0.5, 0.2, 3, -8, 4.2, 8, palm);
+    
+    // Palm 4
+    createColorCylinder(0.35, 4, 8, 2, -8, trunk);
+    createColorBox(3, 0.2, 0.5, 8, 4.2, -8, palm);
+    createColorBox(0.5, 0.2, 3, 8, 4.2, -8, palm);
+    
+    // === FENCES ===
+    // Fence near A site
+    createColorBox(8, 1.2, 0.2, -28, 0.6, -26, fence);
+    createColorBox(0.15, 1.2, 0.15, -32, 0.6, -26, wood);
+    createColorBox(0.15, 1.2, 0.15, -28, 0.6, -26, wood);
+    createColorBox(0.15, 1.2, 0.15, -24, 0.6, -26, wood);
+    
+    // Fence near B site
+    createColorBox(8, 1.2, 0.2, 28, 0.6, 26, fence);
+    createColorBox(0.15, 1.2, 0.15, 32, 0.6, 26, wood);
+    createColorBox(0.15, 1.2, 0.15, 28, 0.6, 26, wood);
+    createColorBox(0.15, 1.2, 0.15, 24, 0.6, 26, wood);
+    
+    // Low wall/fence mid area
+    createColorBox(6, 0.8, 0.3, -5, 0.4, -10, fence);
+    createColorBox(6, 0.8, 0.3, 5, 0.4, 10, fence);
+    
+    // === COVER CRATES ===
+    createColorBox(2, 1.2, 2, -5, 0.6, -5, wood);
+    createColorBox(2, 1.2, 2, 5, 0.6, 5, wood);
+    createColorBox(2, 1.2, 2, -25, 0.6, -18, wood);
+    createColorBox(2, 1.2, 2, 25, 0.6, 18, wood);
+    createColorBox(2, 1.2, 2, 0, 0.6, -8, wood);
+    createColorBox(2, 1.2, 2, 0, 0.6, 8, wood);
+    createColorBox(1.5, 0.9, 1.5, -15, 0.45, 10, wood);
+    createColorBox(1.5, 0.9, 1.5, 15, 0.45, -10, wood);
+    // Stacked crates
+    createColorBox(1.8, 1, 1.8, -25, 0.5, -18, wood);
+    createColorBox(1.3, 0.8, 1.3, -25, 1.4, -18, wood);
+    createColorBox(1.8, 1, 1.8, 25, 0.5, 18, wood);
+    createColorBox(1.3, 0.8, 1.3, 25, 1.4, 18, wood);
+    
+    // === BARRELS ===
+    createColorCylinder(0.5, 1, -20, 0.5, -5, wood);
+    createColorCylinder(0.5, 1, 20, 0.5, 5, wood);
+    createColorCylinder(0.5, 1, -3, 0.5, 20, 0x555555);
+    createColorCylinder(0.5, 1, 3, 0.5, -20, 0x555555);
 }
 
 function createAimMap() {
     mapGroup.visible = true;
     CONFIG.map.size = AIM_MAP_SIZE;
     clearMap();
-    const S = CONFIG.map.size;
+    
+    // Hide enemies in 1v1 mode
+    enemies.forEach(e => { 
+        if (e.mesh) e.mesh.visible = false; 
+        if (e.group) e.group.visible = false; 
+    });
 
-    const groundGeo = new THREE.PlaneGeometry(S * 2, S * 2);
-    const ground = new THREE.Mesh(groundGeo, materials.sandDark);
+    // Floor tiles around perimeter
+    const floorColor = 0x9e8c0a;
+    const floorMat = new THREE.MeshStandardMaterial({ color: floorColor });
+    
+    // Create invisible ground for physics
+    const groundGeo = new THREE.PlaneGeometry(32, 32);
+    const ground = new THREE.Mesh(groundGeo, new THREE.MeshStandardMaterial({ color: 0x1a1a2e }));
     ground.rotation.x = -Math.PI / 2;
+    ground.position.y = 0;
     ground.receiveShadow = true;
     mapGroup.add(ground);
     floor = ground;
+    
+    // Main floor platform
+    createColorBox(26, 0.5, 28, -1, 0.25, 0, 0x9e8c0a);
+    
+    // Perimeter floor tiles (left side: x = -15)
+    for (let z = -15; z <= 15; z += 2) {
+        createColorBox(2, 0.5, 2, -15, 0.25, z, floorColor);
+    }
+    // Bottom side (z = 15)
+    for (let x = -13; x <= 13; x += 2) {
+        createColorBox(2, 0.5, 2, x, 0.25, 15, floorColor);
+    }
+    // Right side (x = 13)
+    for (let z = -15; z <= 13; z += 2) {
+        createColorBox(2, 0.5, 2, 13, 0.25, z, floorColor);
+    }
+    // Top side (z = -15)
+    for (let x = -13; x <= 11; x += 2) {
+        createColorBox(2, 0.5, 2, x, 0.25, -15, floorColor);
+    }
+    
+    // Walls
+    const wallColor = 0x74420c;
+    createColorBox(1, 13.5, 32, -15.5, 7.25, 0, wallColor); // Left wall
+    createColorBox(1, 13.5, 32, 13.5, 7.25, 0, wallColor);  // Right wall
+    createColorBox(30, 13.5, 1, -1, 7.25, 15.5, wallColor); // Bottom wall
+    createColorBox(30, 13.5, 1, -1, 7.25, -15.5, wallColor); // Top wall
+    
+    // Cover boxes (yellow/gold)
+    createColorBox(3.5, 3.5, 3.5, 8.5, 2.25, 8, 0xd7ac1a);
+    createColorBox(3.5, 3.5, 3.5, -10, 2.25, 9, 0xd7ac1a);
+    createColorBox(3.5, 3.5, 3.5, -1, 2.25, 8.5, 0xd7ac1a);
+    
+    // Cylinders (black)
+    createColorCylinder(2, 3, 4.5, 2, 0.5, 0x000000);
+    createColorCylinder(2, 3, -6.5, 2, -6, 0x000000);
+    
+    // Light yellow boxes (bottom area)
+    createColorBox(3.5, 3.5, 3.5, 8, 2.25, -10, 0xffe66d);
+    createColorBox(3.5, 3.5, 3.5, -1, 2.25, -10, 0xffe66d);
+    createColorBox(3.5, 3.5, 3.5, -10, 2.25, -10, 0xffe66d);
+}
 
-    // Perimeter walls to keep players inside
-    createBox(S * 2, 3.5, 1, 0, 1.75, -S, materials.plaster);
-    createBox(S * 2, 3.5, 1, 0, 1.75, S, materials.plaster);
-    createBox(1, 3.5, S * 2, -S, 1.75, 0, materials.plaster);
-    createBox(1, 3.5, S * 2, S, 1.75, 0, materials.plaster);
+// Helper to create colored box
+function createColorBox(w, h, d, x, y, z, color) {
+    const geo = new THREE.BoxGeometry(w, h, d);
+    const mat = new THREE.MeshStandardMaterial({ color });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mapGroup.add(mesh);
+    obstacles.push(mesh);
+    colliders.push({ mesh, box: new THREE.Box3().setFromObject(mesh) });
+    return mesh;
+}
 
-    // Slightly raised mid to echo aim maps
-    createBox(8, 0.4, 8, 0, 0.2, 0, materials.sand);
-
-    const stack = (x, z, levels = 1, w = 2.2, h = 1.6, d = 2.2) => {
-        for (let i = 0; i < levels; i++) {
-            createBox(w, h, d, x, h / 2 + i * h, z, materials.wood);
-        }
-    };
-
-    // Central stacks
-    stack(0, 0, 3);
-    stack(-3, 0, 2);
-    stack(3, 0, 2);
-    stack(0, -4, 2);
-    stack(0, 4, 2);
-
-    // Side covers
-    stack(-8, -6, 1);
-    stack(-8, 6, 1);
-    stack(8, -6, 1);
-    stack(8, 6, 1);
-
-    // Long lane crates
-    stack(-5, -10, 1, 2.4, 1.4, 2.4);
-    stack(5, 10, 1, 2.4, 1.4, 2.4);
-
-    // Small boxes scatter for peeking
-    stack(-2, -8, 1, 1.4, 1.2, 1.4);
-    stack(2, 8, 1, 1.4, 1.2, 1.4);
-    stack(-10, 0, 1, 1.6, 1.4, 1.6);
-    stack(10, 0, 1, 1.6, 1.4, 1.6);
-    // Extra cover for 1v1 variety
-    stack(-6, 2, 2, 2.0, 1.6, 2.0);
-    stack(6, -2, 2, 2.0, 1.6, 2.0);
-    stack(-9, -9, 1, 1.8, 1.4, 1.8);
-    stack(9, 9, 1, 1.8, 1.4, 1.8);
-    stack(-12, 5, 2, 1.6, 1.2, 1.6);
-    stack(12, -5, 2, 1.6, 1.2, 1.6);
-    stack(0, 10, 2, 2.0, 1.6, 2.0);
-    stack(0, -10, 2, 2.0, 1.6, 2.0);
+// Helper to create colored cylinder
+function createColorCylinder(radius, height, x, y, z, color) {
+    const geo = new THREE.CylinderGeometry(radius, radius, height, 16);
+    const mat = new THREE.MeshStandardMaterial({ color });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mapGroup.add(mesh);
+    obstacles.push(mesh);
+    colliders.push({ mesh, box: new THREE.Box3().setFromObject(mesh) });
+    return mesh;
 }
 
 function createSandboxMap() {
@@ -5330,7 +5499,7 @@ function placePlayer(position) {
 
 function getAimSpawn(index = 0) {
     const spawn = AIM_SPAWNS[index % AIM_SPAWNS.length];
-    return new THREE.Vector3(spawn.x, CONFIG.player.height, spawn.z);
+    return new THREE.Vector3(spawn.x, spawn.y || CONFIG.player.height, spawn.z);
 }
 
 function respawnLocalPlayer() {
@@ -5889,12 +6058,16 @@ const mapEditor = {
     objectSize: { w: 2, h: 2, d: 2 },
     rotation: 0,
     placedObjects: [],
+    spawnPoints: [],
+    mapMode: '1v1',
     ghostMesh: null,
     previewRenderer: null,
     previewScene: null,
     previewCamera: null,
     previewMesh: null,
     editorFloor: null,
+    undoStack: [],
+    redoStack: [],
     gridHelper: null,
     hiddenObjects: [],
     originalBackground: null,
@@ -5992,17 +6165,33 @@ function createGhostMesh() {
         mapEditor.ghostMesh.material.dispose();
     }
     
-    const geo = createEditorGeometry(mapEditor.selectedShape, mapEditor.objectSize);
-    const mat = new THREE.MeshStandardMaterial({ 
-        color: mapEditor.selectedColor,
-        transparent: true,
-        opacity: 0.6
-    });
+    let geo, mat;
+    if (mapEditor.selectedShape === 'spawn') {
+        // Spawn marker - cylinder with flag look
+        geo = new THREE.CylinderGeometry(0.3, 0.3, 2, 8);
+        mat = new THREE.MeshStandardMaterial({ 
+            color: 0x4ade80,
+            transparent: true,
+            opacity: 0.7,
+            emissive: 0x4ade80,
+            emissiveIntensity: 0.3
+        });
+    } else {
+        geo = createEditorGeometry(mapEditor.selectedShape, mapEditor.objectSize);
+        mat = new THREE.MeshStandardMaterial({ 
+            color: mapEditor.selectedColor,
+            transparent: true,
+            opacity: 0.6
+        });
+    }
     mapEditor.ghostMesh = new THREE.Mesh(geo, mat);
     mapEditor.ghostMesh.rotation.y = mapEditor.rotation;
     
     if (mapEditor.selectedShape === 'plane') {
         mapEditor.ghostMesh.rotation.x = -Math.PI / 2;
+    }
+    if (mapEditor.selectedShape === 'spawn') {
+        mapEditor.ghostMesh.position.y = 1; // Lift spawn marker
     }
     
     scene.add(mapEditor.ghostMesh);
@@ -6047,6 +6236,40 @@ function updateGhostPosition(event) {
 function placeObject() {
     if (!mapEditor.ghostMesh) return;
     
+    // Handle spawn placement
+    if (mapEditor.selectedShape === 'spawn') {
+        const maxSpawns = getMaxSpawns();
+        if (maxSpawns !== Infinity && mapEditor.spawnPoints.length >= maxSpawns) {
+            return; // Can't place more spawns
+        }
+        
+        const geo = new THREE.CylinderGeometry(0.3, 0.3, 2, 8);
+        const mat = new THREE.MeshStandardMaterial({ 
+            color: 0x4ade80,
+            emissive: 0x4ade80,
+            emissiveIntensity: 0.2
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(mapEditor.ghostMesh.position);
+        mesh.position.y = 1;
+        scene.add(mesh);
+        
+        mapEditor.spawnPoints.push({
+            mesh,
+            position: mesh.position.clone()
+        });
+        
+        // Save action for undo
+        saveEditorAction({
+            type: 'placeSpawn',
+            mesh,
+            data: { position: mesh.position.clone() }
+        });
+        
+        updateSpawnsUI();
+        return;
+    }
+    
     const geo = createEditorGeometry(mapEditor.selectedShape, { ...mapEditor.objectSize });
     const mat = new THREE.MeshStandardMaterial({ color: mapEditor.selectedColor });
     const mesh = new THREE.Mesh(geo, mat);
@@ -6058,14 +6281,171 @@ function placeObject() {
     scene.add(mesh);
     obstacles.push(mesh);
     
-    mapEditor.placedObjects.push({
+    const objData = {
         mesh,
         shape: mapEditor.selectedShape,
         color: mapEditor.selectedColor,
         size: { ...mapEditor.objectSize },
         position: mesh.position.clone(),
         rotation: mesh.rotation.clone()
+    };
+    mapEditor.placedObjects.push(objData);
+    
+    // Save action for undo
+    saveEditorAction({
+        type: 'place',
+        mesh,
+        data: { ...objData }
     });
+}
+
+function getMaxSpawns() {
+    switch(mapEditor.mapMode) {
+        case '1v1': return 2;
+        case '5v5': return 10;
+        case 'ffa': return Infinity;
+        case 'sandbox': return Infinity;
+        default: return 2;
+    }
+}
+
+function updateSpawnsUI() {
+    const placed = document.getElementById('spawns-placed');
+    const needed = document.getElementById('spawns-needed');
+    if (placed) placed.textContent = mapEditor.spawnPoints.length;
+    if (needed) {
+        const max = getMaxSpawns();
+        needed.textContent = max === Infinity ? '∞' : max;
+    }
+}
+
+// Undo/Redo system
+function saveEditorAction(action) {
+    mapEditor.undoStack.push(action);
+    mapEditor.redoStack = []; // Clear redo stack on new action
+    if (mapEditor.undoStack.length > 50) mapEditor.undoStack.shift(); // Limit history
+}
+
+function editorUndo() {
+    if (mapEditor.undoStack.length === 0) return;
+    const action = mapEditor.undoStack.pop();
+    
+    if (action.type === 'place') {
+        // Remove the placed object
+        const obj = mapEditor.placedObjects.find(o => o.mesh === action.mesh);
+        if (obj) {
+            scene.remove(action.mesh);
+            const idx = obstacles.indexOf(action.mesh);
+            if (idx !== -1) obstacles.splice(idx, 1);
+            action.mesh.geometry.dispose();
+            action.mesh.material.dispose();
+            mapEditor.placedObjects = mapEditor.placedObjects.filter(o => o.mesh !== action.mesh);
+        }
+    } else if (action.type === 'placeSpawn') {
+        // Remove spawn
+        const spawn = mapEditor.spawnPoints.find(s => s.mesh === action.mesh);
+        if (spawn) {
+            scene.remove(action.mesh);
+            action.mesh.geometry.dispose();
+            action.mesh.material.dispose();
+            mapEditor.spawnPoints = mapEditor.spawnPoints.filter(s => s.mesh !== action.mesh);
+            updateSpawnsUI();
+        }
+    } else if (action.type === 'remove') {
+        // Restore removed object
+        const geo = createEditorGeometry(action.data.shape, action.data.size);
+        const mat = new THREE.MeshStandardMaterial({ color: action.data.color });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(action.data.position);
+        mesh.rotation.copy(action.data.rotation);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        scene.add(mesh);
+        obstacles.push(mesh);
+        mapEditor.placedObjects.push({
+            mesh,
+            shape: action.data.shape,
+            color: action.data.color,
+            size: action.data.size,
+            position: mesh.position.clone(),
+            rotation: mesh.rotation.clone()
+        });
+        action.mesh = mesh; // Update reference for redo
+    } else if (action.type === 'removeSpawn') {
+        // Restore spawn
+        const geo = new THREE.CylinderGeometry(0.3, 0.3, 2, 8);
+        const mat = new THREE.MeshStandardMaterial({ 
+            color: 0x4ade80,
+            emissive: 0x4ade80,
+            emissiveIntensity: 0.2
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(action.data.position);
+        scene.add(mesh);
+        mapEditor.spawnPoints.push({ mesh, position: mesh.position.clone() });
+        action.mesh = mesh;
+        updateSpawnsUI();
+    }
+    
+    mapEditor.redoStack.push(action);
+}
+
+function editorRedo() {
+    if (mapEditor.redoStack.length === 0) return;
+    const action = mapEditor.redoStack.pop();
+    
+    if (action.type === 'place') {
+        // Re-place object
+        const geo = createEditorGeometry(action.data.shape, action.data.size);
+        const mat = new THREE.MeshStandardMaterial({ color: action.data.color });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(action.data.position);
+        mesh.rotation.copy(action.data.rotation);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        scene.add(mesh);
+        obstacles.push(mesh);
+        mapEditor.placedObjects.push({
+            mesh,
+            shape: action.data.shape,
+            color: action.data.color,
+            size: action.data.size,
+            position: mesh.position.clone(),
+            rotation: mesh.rotation.clone()
+        });
+        action.mesh = mesh;
+    } else if (action.type === 'placeSpawn') {
+        // Re-place spawn
+        const geo = new THREE.CylinderGeometry(0.3, 0.3, 2, 8);
+        const mat = new THREE.MeshStandardMaterial({ 
+            color: 0x4ade80,
+            emissive: 0x4ade80,
+            emissiveIntensity: 0.2
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(action.data.position);
+        scene.add(mesh);
+        mapEditor.spawnPoints.push({ mesh, position: mesh.position.clone() });
+        action.mesh = mesh;
+        updateSpawnsUI();
+    } else if (action.type === 'remove' || action.type === 'removeSpawn') {
+        // Re-remove object
+        if (action.mesh) {
+            scene.remove(action.mesh);
+            if (action.type === 'remove') {
+                const idx = obstacles.indexOf(action.mesh);
+                if (idx !== -1) obstacles.splice(idx, 1);
+                mapEditor.placedObjects = mapEditor.placedObjects.filter(o => o.mesh !== action.mesh);
+            } else {
+                mapEditor.spawnPoints = mapEditor.spawnPoints.filter(s => s.mesh !== action.mesh);
+                updateSpawnsUI();
+            }
+            action.mesh.geometry.dispose();
+            action.mesh.material.dispose();
+        }
+    }
+    
+    mapEditor.undoStack.push(action);
 }
 
 function removeObjectAt(event) {
@@ -6078,6 +6458,27 @@ function removeObjectAt(event) {
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(mouse, camera);
     
+    // Check spawns first
+    const spawnMeshes = mapEditor.spawnPoints.map(s => s.mesh);
+    const spawnIntersects = raycaster.intersectObjects(spawnMeshes);
+    if (spawnIntersects.length > 0) {
+        const hitMesh = spawnIntersects[0].object;
+        const index = mapEditor.spawnPoints.findIndex(s => s.mesh === hitMesh);
+        if (index !== -1) {
+            const spawn = mapEditor.spawnPoints[index];
+            // Save for undo before removing
+            saveEditorAction({
+                type: 'removeSpawn',
+                mesh: hitMesh,
+                data: { position: spawn.position.clone() }
+            });
+            scene.remove(hitMesh);
+            mapEditor.spawnPoints.splice(index, 1);
+            updateSpawnsUI();
+        }
+        return;
+    }
+    
     const meshes = mapEditor.placedObjects.map(o => o.mesh);
     const intersects = raycaster.intersectObjects(meshes);
     
@@ -6085,11 +6486,22 @@ function removeObjectAt(event) {
         const hitMesh = intersects[0].object;
         const index = mapEditor.placedObjects.findIndex(o => o.mesh === hitMesh);
         if (index !== -1) {
+            const obj = mapEditor.placedObjects[index];
+            // Save for undo before removing
+            saveEditorAction({
+                type: 'remove',
+                mesh: hitMesh,
+                data: {
+                    shape: obj.shape,
+                    color: obj.color,
+                    size: { ...obj.size },
+                    position: obj.position.clone(),
+                    rotation: obj.rotation.clone()
+                }
+            });
             scene.remove(hitMesh);
             const obsIdx = obstacles.indexOf(hitMesh);
             if (obsIdx !== -1) obstacles.splice(obsIdx, 1);
-            hitMesh.geometry.dispose();
-            hitMesh.material.dispose();
             mapEditor.placedObjects.splice(index, 1);
         }
     }
@@ -6219,6 +6631,12 @@ function startMapEditor() {
     document.getElementById('hud').style.display = 'none';
     document.getElementById('crosshair').style.display = 'none';
     
+    // Hide weapons in editor
+    weaponGroup.visible = false;
+    sniperGroup.visible = false;
+    knifeGroup.visible = false;
+    rocketLauncherGroup.visible = false;
+    
     // Save original scene settings
     if (!mapEditor.originalBackground) {
         mapEditor.originalBackground = scene.background;
@@ -6231,6 +6649,9 @@ function startMapEditor() {
     
     // Setup empty editor scene
     setupEditorScene();
+    
+    // Update spawns UI
+    updateSpawnsUI();
     
     // Reset camera for editor
     camera.position.set(0, 30, 30);
@@ -6286,17 +6707,34 @@ function clearEditorObjects() {
         obj.mesh.material.dispose();
     });
     mapEditor.placedObjects = [];
+    
+    // Clear spawns too
+    mapEditor.spawnPoints.forEach(spawn => {
+        scene.remove(spawn.mesh);
+        spawn.mesh.geometry.dispose();
+        spawn.mesh.material.dispose();
+    });
+    mapEditor.spawnPoints = [];
+    updateSpawnsUI();
 }
 
 function saveEditorMap() {
-    const data = mapEditor.placedObjects.map(obj => ({
-        shape: obj.shape,
-        color: obj.color,
-        size: obj.size,
-        position: { x: obj.position.x, y: obj.position.y, z: obj.position.z },
-        rotation: { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z }
-    }));
-    const json = JSON.stringify(data, null, 2);
+    const mapData = {
+        mode: mapEditor.mapMode,
+        objects: mapEditor.placedObjects.map(obj => ({
+            shape: obj.shape,
+            color: obj.color,
+            size: obj.size,
+            position: { x: obj.position.x, y: obj.position.y, z: obj.position.z },
+            rotation: { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z }
+        })),
+        spawns: mapEditor.spawnPoints.map(s => ({
+            x: s.position.x,
+            y: s.position.y,
+            z: s.position.z
+        }))
+    };
+    const json = JSON.stringify(mapData, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -6316,9 +6754,20 @@ function loadEditorMap() {
         const reader = new FileReader();
         reader.onload = (ev) => {
             try {
-                const data = JSON.parse(ev.target.result);
+                const parsed = JSON.parse(ev.target.result);
                 clearEditorObjects();
-                data.forEach(obj => {
+                
+                // Support old format (array) and new format (object)
+                const objects = Array.isArray(parsed) ? parsed : (parsed.objects || []);
+                const spawns = parsed.spawns || [];
+                const mode = parsed.mode || '1v1';
+                
+                // Set map mode
+                mapEditor.mapMode = mode;
+                document.getElementById('editor-map-mode').value = mode;
+                
+                // Load objects
+                objects.forEach(obj => {
                     const geo = createEditorGeometry(obj.shape, obj.size);
                     const mat = new THREE.MeshStandardMaterial({ color: obj.color });
                     const mesh = new THREE.Mesh(geo, mat);
@@ -6337,6 +6786,25 @@ function loadEditorMap() {
                         rotation: mesh.rotation.clone()
                     });
                 });
+                
+                // Load spawns
+                spawns.forEach(s => {
+                    const geo = new THREE.CylinderGeometry(0.3, 0.3, 2, 8);
+                    const mat = new THREE.MeshStandardMaterial({ 
+                        color: 0x4ade80,
+                        emissive: 0x4ade80,
+                        emissiveIntensity: 0.2
+                    });
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.position.set(s.x, s.y, s.z);
+                    scene.add(mesh);
+                    mapEditor.spawnPoints.push({
+                        mesh,
+                        position: mesh.position.clone()
+                    });
+                });
+                
+                updateSpawnsUI();
             } catch (err) {
                 console.error('Failed to load map:', err);
             }
@@ -6366,6 +6834,9 @@ function testEditorMap() {
     
     // Fresh collision list only with editor content
     colliders.length = 0;
+    
+    // Hide enemies in test mode
+    enemies.forEach(e => { if (e.mesh) e.mesh.visible = false; if (e.group) e.group.visible = false; });
     
     // Add editor floor to colliders for ground detection
     if (mapEditor.editorFloor) {
@@ -6482,6 +6953,14 @@ document.getElementById('editor-clear').addEventListener('click', clearEditorObj
 document.getElementById('editor-save').addEventListener('click', saveEditorMap);
 document.getElementById('editor-load').addEventListener('click', loadEditorMap);
 document.getElementById('editor-test').addEventListener('click', testEditorMap);
+document.getElementById('editor-undo').addEventListener('click', editorUndo);
+document.getElementById('editor-redo').addEventListener('click', editorRedo);
+
+// Map mode selector
+document.getElementById('editor-map-mode').addEventListener('change', (e) => {
+    mapEditor.mapMode = e.target.value;
+    updateSpawnsUI();
+});
 
 // Shape buttons
 document.querySelectorAll('.editor-shape-btn').forEach(btn => {
@@ -6500,9 +6979,18 @@ document.querySelectorAll('.editor-color-btn').forEach(btn => {
         document.querySelectorAll('.editor-color-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         mapEditor.selectedColor = btn.dataset.color;
+        document.getElementById('editor-color-picker').value = btn.dataset.color;
         createGhostMesh();
         updateEditorPreview();
     });
+});
+
+// Color picker
+document.getElementById('editor-color-picker').addEventListener('input', (e) => {
+    document.querySelectorAll('.editor-color-btn').forEach(b => b.classList.remove('active'));
+    mapEditor.selectedColor = e.target.value;
+    createGhostMesh();
+    updateEditorPreview();
 });
 
 // Size inputs
@@ -6544,17 +7032,17 @@ document.addEventListener('mousedown', (e) => {
     
     if (e.button === 0) { // Left click - place
         placeObject();
-    } else if (e.button === 2) { // Right click - remove or orbit
-        removeObjectAt(e);
-    } else if (e.button === 1) { // Middle click - orbit camera
+    } else if (e.button === 2) { // Right click - orbit camera
         editorCameraState.isDragging = true;
         editorCameraState.lastX = e.clientX;
         editorCameraState.lastY = e.clientY;
+    } else if (e.button === 1) { // Middle click - remove
+        removeObjectAt(e);
     }
 });
 
 document.addEventListener('mouseup', (e) => {
-    if (e.button === 1) {
+    if (e.button === 2) {
         editorCameraState.isDragging = false;
     }
 });
@@ -6582,6 +7070,19 @@ document.addEventListener('wheel', (e) => {
 
 document.addEventListener('keydown', (e) => {
     if (!mapEditor.active) return;
+    
+    // Ctrl+Z for undo, Ctrl+Y for redo
+    if (e.ctrlKey || e.metaKey) {
+        if (e.code === 'KeyZ') {
+            e.preventDefault();
+            editorUndo();
+            return;
+        } else if (e.code === 'KeyY') {
+            e.preventDefault();
+            editorRedo();
+            return;
+        }
+    }
     
     const moveSpeed = 2;
     switch (e.code) {
@@ -6753,14 +7254,7 @@ if (sensMobile) {
 
 function unlockCheats() {
     const code = secretInput.value.trim();
-    if (code === 'Федя') {
-        state.cheatsUnlocked = true;
-        cheatPanel.classList.add('active');
-        document.getElementById('secret-wrapper').classList.add('unlocked');
-        saveCheatsState();
-        applyCheatUIFromState();
-        normalizeCheatsEnabled();
-    } else if (code === 'тикитоки') {
+    if (code === 'тикитоки') {
         state.adminUnlocked = true;
         state.cheatsUnlocked = true;
         cheatPanel.classList.add('active');
@@ -7225,6 +7719,9 @@ function applyControlsConfig() {
         if (cfg.right !== undefined && cfg.right !== null) {
             el.style.right = cfg.right + 'px';
             el.style.left = 'auto';
+        } else if (cfg.left !== undefined && cfg.left !== null) {
+            el.style.left = cfg.left + 'px';
+            el.style.right = 'auto';
         } else if (cfg.x !== undefined && cfg.x !== null) {
             el.style.left = cfg.x + 'px';
             el.style.right = 'auto';
@@ -7274,6 +7771,8 @@ function openEditor() {
             let left;
             if (cfg.right !== undefined && cfg.right !== null) {
                 left = areaRect.width - cfg.right - cfg.size;
+            } else if (cfg.left !== undefined && cfg.left !== null) {
+                left = cfg.left;
             } else {
                 left = cfg.x || 30;
             }
@@ -7384,7 +7883,7 @@ function saveControls() {
         if (leftX > areaRect.width / 2) {
             controlsConfig[key] = { right: Math.round(rightX), y: Math.round(bottomY), size: Math.round(size) };
         } else {
-            controlsConfig[key] = { x: Math.round(leftX), y: Math.round(bottomY), size: Math.round(size) };
+            controlsConfig[key] = { left: Math.round(leftX), y: Math.round(bottomY), size: Math.round(size) };
         }
     });
     
@@ -7689,11 +8188,29 @@ document.addEventListener('touchend', () => { if(draggedHud) { draggedHud.classL
 
 function saveHudConfig() {
     document.querySelectorAll('.hud-draggable').forEach(el => {
-        const k = el.dataset.hudKey, s = el.style; hudConfig[k] = {};
-        if(s.top && s.top !== 'auto') hudConfig[k].top = parseInt(s.top);
-        if(s.bottom && s.bottom !== 'auto') hudConfig[k].bottom = parseInt(s.bottom);
-        if(s.left && s.left !== 'auto') hudConfig[k].left = parseInt(s.left);
-        if(s.right && s.right !== 'auto') hudConfig[k].right = parseInt(s.right);
+        const k = el.dataset.hudKey, s = el.style;
+        const currentCfg = hudConfig[k] || {};
+        const newCfg = {};
+        // Preserve existing config if style not set
+        if(s.top && s.top !== 'auto') {
+            newCfg.top = parseInt(s.top);
+        } else if(s.bottom && s.bottom !== 'auto') {
+            newCfg.bottom = parseInt(s.bottom);
+        } else if(currentCfg.top !== undefined) {
+            newCfg.top = currentCfg.top;
+        } else if(currentCfg.bottom !== undefined) {
+            newCfg.bottom = currentCfg.bottom;
+        }
+        if(s.left && s.left !== 'auto') {
+            newCfg.left = parseInt(s.left);
+        } else if(s.right && s.right !== 'auto') {
+            newCfg.right = parseInt(s.right);
+        } else if(currentCfg.left !== undefined) {
+            newCfg.left = currentCfg.left;
+        } else if(currentCfg.right !== undefined) {
+            newCfg.right = currentCfg.right;
+        }
+        hudConfig[k] = newCfg;
     });
     localStorage.setItem('standoffHud', JSON.stringify(hudConfig));
     applyHudConfig();
